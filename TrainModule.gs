@@ -190,6 +190,18 @@ function stockText_() {
     return textCard_('待補庫存' + zero.length + '關', '#B04A3A', zlines.join('\n'));
   }
   keys.sort(function(a, b) { return m.map[a].idx - m.map[b].idx; });
+
+  // 1. 每個人的進度（顯示在上面）
+  var progressRows = [];
+  progressRows.push({ type: 'text', text: '【徒弟進度】', size: 'sm', color: '#8B7355', weight: 'bold', wrap: true });
+  contributors.forEach(function(nm) {
+    var g = s.by[nm];
+    var nu = g.latestIdx >= 0 ? s.sop.list[g.latestIdx + 1] : null;
+    var nxt = nu ? (nu.unit + '（' + (g.stung[nu.key] ? '已刺令/' : '') + (nu.c > 0 ? '蓋章' + nu.c : (nu.b > 0 ? '列印' + nu.b : '未備料')) + '）') : '完訓';
+    progressRows.push({ type: 'text', text: nm + '：完成 ' + g.done + '/進行中 ' + g.active + ' ｜下：' + nxt, size: 'xs', color: '#333333', wrap: true, margin: 'xs' });
+  });
+
+  // 2. 需求清單（標註冊別）
   var rows = [];
   keys.forEach(function(key) {
     var o = m.map[key];
@@ -198,9 +210,10 @@ function stockText_() {
     if (need <= 0) return;
     var stock = o.b + o.c;
     var lack = Math.max(0, need - stock);
-    var label = pageLabel_(o.unit);
+    var vol = (o.unit.match(/^(.+冊)/) || ['', ''])[1] || '';
+    var label = (vol ? vol + ' ' : '') + pageLabel_(o.unit);
     rows.push({ type: 'box', layout: 'horizontal', margin: rows.length > 0 ? 'sm' : 'none', contents: [
-      { type: 'text', text: label, size: 'sm', color: '#333333', flex: 2, wrap: true },
+      { type: 'text', text: label, size: 'sm', color: '#333333', flex: 3, wrap: true },
       { type: 'text', text: '庫' + stock + '（印' + o.b + '/章' + o.c + '）', size: 'sm', color: '#333333', flex: 4, wrap: true },
       { type: 'text', text: '需' + need, size: 'sm', color: '#333333', flex: 1, wrap: true },
       { type: 'text', text: '缺' + lack, size: 'sm', color: lack > 0 ? '#B04A3A' : '#4A7C59', flex: 1, wrap: true }
@@ -208,9 +221,11 @@ function stockText_() {
     rows.push({ type: 'separator', margin: 'xs' });
   });
   if (!rows.length) return textCard_('庫存', '#4A7C59', '3關內人人都有料，不用補');
+
+  var bodyContents = progressRows.concat([{ type: 'separator', margin: 'sm' }]).concat(rows.slice(0, 40));
   var card = { type: 'flex', altText: '3關內需求', contents: { type: 'bubble',
     header: { type: 'box', layout: 'vertical', backgroundColor: '#8B7355', contents: [{ type: 'text', text: '3關內需求（' + contributors.length + '人）', size: 'md', color: '#ffffff', weight: 'bold', wrap: true }] },
-    body: { type: 'box', layout: 'vertical', spacing: 'xs', contents: rows.slice(0, 30) }
+    body: { type: 'box', layout: 'vertical', spacing: 'xs', contents: bodyContents }
   }};
   return card;
 }
