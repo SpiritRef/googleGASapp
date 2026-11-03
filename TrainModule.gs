@@ -154,6 +154,7 @@ function trainOverview_() {
 }
 
 function stockText_() {
+  try {
   var m = sopMap_();
   if (!m.list.length) return textCard_('庫存', '#8B7355', 'SOP表無資料');
 
@@ -214,11 +215,17 @@ function stockText_() {
     });
   });
 
+  var bodyContents = rows;
+  if (bodyContents.length > 80) {
+    bodyContents = bodyContents.slice(0, 80);
+    bodyContents.push({ type: 'text', text: '…（資料過多，僅顯示前 80 筆）', size: 'xs', color: '#999999', wrap: true, margin: 'sm' });
+  }
   var card = { type: 'flex', altText: '庫存查詢', contents: { type: 'bubble',
     header: { type: 'box', layout: 'vertical', backgroundColor: '#8B7355', contents: [{ type: 'text', text: '庫存查詢', size: 'md', color: '#ffffff', weight: 'bold', wrap: true }] },
-    body: { type: 'box', layout: 'vertical', spacing: 'xs', contents: rows }
+    body: { type: 'box', layout: 'vertical', spacing: 'xs', contents: bodyContents }
   }};
   return card;
+  } catch (e) { return textCard_('庫存查詢錯誤', '#B04A3A', String(e)); }
 }
 
 function sopVolumes_() {
