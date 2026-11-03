@@ -267,8 +267,8 @@ function tUpdCards_(q) {
 function tAddCards_(q) {
   if (!q.kind) {
     return btnCard_('補庫存・選種類', '#8B7355', '第一步：選種類', [
-      pbBtn_('蓋章+1', 'action=tadd&step=vol&kind=C', '補庫存 蓋章', 'primary', '#8B7355'),
-      pbBtn_('列印+1', 'action=tadd&step=vol&kind=B', '補庫存 列印', 'secondary')
+      pbBtn_('列印+1', 'action=tadd&step=vol&kind=B', '補庫存 列印', 'secondary'),
+      pbBtn_('蓋章+1', 'action=tadd&step=vol&kind=C', '補庫存 蓋章', 'primary', '#8B7355')
     ]);
   }
   if (!q.vol && q.step !== 'done') {
