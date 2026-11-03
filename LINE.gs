@@ -470,9 +470,22 @@ function handleCommand_(text) {
     if (!mm2) return textCard_('找不到單元', '#B04A3A', am[1] + '（用「庫存」看正確名稱）');
     var sh2 = sheetByName_(SHEET_SOP);
     var isC = am[2] === '蓋章';
-    sh2.getRange(mm2.row, isC ? 3 : 2).setValue((isC ? mm2.c : mm2.b) + 1);
-    return textCard_('已補庫存', '#4A7C59', am[1] + ' ' + am[2] + '+1');
+    var newB, newC;
+    if (isC) {
+      if (mm2.b > 0) { newB = mm2.b - 1; newC = mm2.c + 1; }
+      else { newB = mm2.b; newC = mm2.c + 1; }
+    } else {
+      newB = mm2.b + 1; newC = mm2.c;
+    }
+    sh2.getRange(mm2.row, 2).setValue(newB);
+    sh2.getRange(mm2.row, 3).setValue(newC);
+    return textCard_('已補庫存', '#4A7C59', am[1] + ' ' + am[2] + '+1（現印' + newB + '章' + newC + '）');
   }
+  var sm = t.match(/^設庫存\s+(.+)\s+(列印|蓋章)\s+(\d+)$/);
+  if (sm) return setStock_(sm[1].trim(), sm[2], Number(sm[3]));
+  if (/^(庫存盤點|盤點庫存)$/.test(t)) return stockCheckAll_();
+  var vm = t.match(/^盤點\s+(.+)$/);
+  if (vm) return stockCheckVol_(vm[1].trim());
   var lm = t.match(/^(列表|清單)\s*(待處理|處理中|無法聯繫|未結案|全部|結案|已結案)?$/);
   if (lm) {
     var lr = listCases_(lm[2] || '未結案');
@@ -692,166 +705,6 @@ function sheetByName_(name) {
   }
   return null;
 }
-function sopMap_() {
-  var sh = sheetByName_(SHEET_SOP);
-  if (!sh) return { sh: null, list: [], map: {} };
-  var n = sh.getLastRow() - 1;
-  if (n < 1) return { sh: sh, list: [], map: {} };
-  var v = sh.getRange(2, 1, n, 3).getValues();
-  var list = [], map = {};
-  v.forEach(function(r, i) {
-    if (!norm_(r[0])) return;
-    var o = { unit: String(r[0]).trim(), key: norm_(r[0]), b: Number(r[1]) || 0, c: Number(r[2]) || 0, row: i + 2, idx: list.length };
-    list.push(o); map[o.key] = o;
-  });
-  return { sh: sh, list: list, map: map };
-}
-function trainRows_() {
-  var sh = sheetByName_(SHEET_TRAIN);
-  if (!sh) return { sh: null, rows: [] };
-  var n = sh.getLastRow() - 1;
-  if (n < 1) return { sh: sh, rows: [] };
-  return { sh: sh, rows: sh.getRange(2, 1, n, 5).getValues() };
-}
-function ensureTrainSheets_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var s1 = sheetByName_(SHEET_SOP) || ss.insertSheet(SHEET_SOP);
-  if (norm_(s1.getRange(1, 1).getValue()) !== '訓練單元') s1.getRange(1, 1, 1, 3).setValues([['訓練單元', '已列印份數', '已蓋章份數']]);
-  var s2 = sheetByName_(SHEET_TRAIN) || ss.insertSheet(SHEET_TRAIN);
-  if (norm_(s2.getRange(1, 1).getValue()) !== 'ID') s2.getRange(1, 1, 1, 5).setValues([['ID', '姓名', '訓練單元', '狀態', '更新時間']]);
-}
-function deductStock_(unit) {
-  var m = sopMap_();
-  var o = m.map[norm_(unit)];
-  if (!o) return false;
-  if (o.c > 0) m.sh.getRange(o.row, 3).setValue(o.c - 1);
-  else if (o.b > 0) m.sh.getRange(o.row, 2).setValue(o.b - 1);
-  else return false;
-  return true;
-}
-function trainAppend_(name, unit, status) {
-  ensureTrainSheets_();
-  var ss = sheetByName_(SHEET_TRAIN);
-  var id = new Date().getTime().toString(36) + Math.floor(Math.random() * 99);
-  ss.appendRow([id, name, unit, status, new Date()]);
-}
-function hasSting_(name, unit) {
-  var t = trainRows_().rows;
-  var nk = norm_(name), uk = norm_(unit);
-  for (var i = 0; i < t.length; i++) {
-    if (norm_(t[i][1]) === nk && norm_(t[i][2]) === uk && norm_(t[i][3]) === '已刺令') return true;
-  }
-  return false;
-}
-function setTrain_(name, unit, status) {
-  var m = sopMap_();
-  var o = m.map[norm_(unit)];
-  if (!o) return textCard_('找不到單元', '#B04A3A', unit + '（用「庫存」看正確名稱）');
-  if (status === '已刺令' || status === '已領取') {
-    if (!hasSting_(name, unit)) {
-      if (status === '已刺令') trainAppend_(name, o.unit, '已刺令');
-      else { trainAppend_(name, o.unit, '已刺令'); trainAppend_(name, o.unit, '已領取'); }
-      var ok = deductStock_(o.unit);
-      return textCard_('已更新', '#4A7C59', name + '・' + o.unit + '→' + status + (ok ? '（已扣庫存）' : '（庫存不足0）'));
-    }
-  }
-  trainAppend_(name, o.unit, status);
-  return textCard_('已更新', '#4A7C59', name + '・' + o.unit + '→' + status);
-}
-function apprenticeState_() {
-  var m = sopMap_();
-  var pos = {}; m.list.forEach(function(o) { pos[o.key] = o.idx; });
-  var rows = trainRows_().rows;
-  var by = {};
-  var unmatched = [];
-  rows.forEach(function(r) {
-    var nm = String(r[1]).trim(); if (!nm) return;
-    var st = norm_(r[3]);
-    var uk = norm_(r[2]);
-    var g = by[nm] || (by[nm] = { name: nm, active: 0, done: 0, latestIdx: -1, earliest: Infinity, units: [], stung: {}, have: {} });
-    if (st === '已領取') {
-      g.active++;
-      g.units.push(String(r[2]).trim());
-      var tm = new Date(r[4]).getTime();
-      if (!isNaN(tm) && tm < g.earliest) g.earliest = tm;
-    }
-    if (st === 'V' || st === 'v') g.done++;
-    if (st === '已刺令') g.stung[uk] = true;
-    if (st === 'V' || st === 'v' || st === '已領取' || st === '已刺令') g.have[uk] = true;
-    if ((st === '已領取' || st === 'V' || st === 'v')) {
-      if (uk && pos[uk] !== undefined) { if (pos[uk] > g.latestIdx) g.latestIdx = pos[uk]; }
-      else if (uk && unmatched.length < 3 && unmatched.indexOf(String(r[2]).trim()) === -1) unmatched.push(String(r[2]).trim());
-    }
-  });
-  return { sop: m, by: by, unmatched: unmatched };
-}
-function trainOverview_() {
-  var s = apprenticeState_();
-  var names = Object.keys(s.by);
-  if (!names.length) return { card: textCard_('全體進度', '#8B7355', '訓練紀錄無資料'), copy: null };
-  var lines = names.map(function(nm) {
-    var g = s.by[nm];
-    if (!g.active) {
-      if (g.done > 0 && g.latestIdx >= 0 && g.latestIdx >= s.sop.list.length - 1) return nm + '｜完訓（共完' + g.done + '）';
-      return nm + '｜⚠LOSS（無進行中，完' + g.done + '）';
-    }
-    var nu = s.sop.list[g.latestIdx + 1];
-    var nxt = '完訓';
-    if (nu) {
-      var tags = [];
-      if (g.stung[nu.key]) tags.push('已刺令');
-      if (nu.c > 0) tags.push('蓋章' + nu.c);
-      else if (nu.b > 0) tags.push('列印' + nu.b);
-      else tags.push('未備料');
-      nxt = nu.unit + '(' + tags.join('/') + ')';
-    }
-    return nm + '｜完成' + g.done + '/進行中' + g.active + '｜' + g.units.join('、').slice(0, 80) + '｜下:' + nxt;
-  });
-  return { card: textCard_('全體進度共' + names.length + '人', '#8B7355', lines.slice(0, 15).join('\n')), copy: null };
-}
-function stockText_() {
-  var s = apprenticeState_();
-  var m = s.sop;
-  if (!m.list.length) return { card: textCard_('庫存', '#8B7355', 'SOP表無資料'), copy: null };
-  var dem = {}, i, g, k;
-  var names = Object.keys(s.by);
-  var contributors = [];
-  for (i = 0; i < names.length; i++) {
-    g = s.by[names[i]];
-    if (!g.active || g.latestIdx < 0) continue;
-    contributors.push(names[i]);
-    for (k = 1; k <= 3; k++) {
-      var o = m.list[g.latestIdx + k];
-      if (!o) break;
-      dem[o.key] = true;
-    }
-  }
-  var keys = Object.keys(dem);
-  if (!keys.length) {
-    var hasActive = names.some(function(nm) { return s.by[nm].active > 0; });
-    if (hasActive && s.unmatched.length) {
-      return { card: textCard_('單元名稱對不上', '#B04A3A', '紀錄：' + s.unmatched.join('、') + '\nSOP首筆：' + m.list[0].unit + '\n請兩邊用完全相同名稱'), copy: null };
-    }
-    var minLatest = Infinity;
-    names.forEach(function(nm) { var li = s.by[nm].latestIdx; if (li >= 0 && li < minLatest) minLatest = li; });
-    var zero = m.list.filter(function(o) { return (o.b + o.c) < 1 && (minLatest === Infinity || o.idx > minLatest); });
-    if (!zero.length) return { card: textCard_('庫存', '#4A7C59', '目前無進行中徒弟，且全關都有庫存'), copy: null };
-    return { card: textCard_('待補庫存' + zero.length + '關', '#B04A3A', zero.slice(0, 15).map(function(o) { return o.unit + '｜庫0'; }).join('\n')), copy: null };
-  }
-  keys.sort(function(a, b) { return m.map[a].idx - m.map[b].idx; });
-  var lines = [];
-  keys.forEach(function(key) {
-    var o = m.map[key];
-    var need = 0, j;
-    for (j = 0; j < contributors.length; j++) { if (!s.by[contributors[j]].have[key]) need++; }
-    if (need <= 0) return;
-    var stock = o.b + o.c;
-    var lack = Math.max(0, need - stock);
-    lines.push(o.unit + '｜需' + need + '｜庫' + stock + (lack > 0 ? '｜缺' + lack : '｜夠'));
-  });
-  if (!lines.length) return { card: textCard_('庫存', '#4A7C59', '3關內人人都有料，不用補'), copy: null };
-  return { card: textCard_('3關內需求（' + contributors.length + '人）', '#8B7355', lines.slice(0, 15).join('\n')), copy: null };
-}
 function pbBtn_(label, data, display, style, color) {
   var b = { type: 'button', action: { type: 'postback', label: label, data: data, displayText: display || label }, height: 'sm', margin: 'sm' };
   if (style) b.style = style;
@@ -988,6 +841,7 @@ function trainMenuCard_() {
     footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
       pbBtn_('訓練總覽', 'action=progress', '訓練總覽', 'primary', '#8B7355'),
       pbBtn_('庫存查詢', 'action=stock', '庫存查詢', 'secondary'),
+      pbBtn_('庫存盤點', 'action=stockcheck', '庫存盤點', 'secondary'),
       pbBtn_('更新進度', 'action=tupd', '更新進度', 'secondary'),
       pbBtn_('補庫存', 'action=tadd', '補庫存', 'secondary')
     ] } } };
@@ -1044,17 +898,6 @@ function doCaseStatus_(caseId, to) {
   found.sheet.getRange(found.row, STATUS_COL).setValue(to === '結案' ? '已結案' : to);
   return caseCard_(found.sheet.getRange(found.row, 2).getValue());
 }
-function sopVolumes_() {
-  var m = sopMap_();
-  var vols = [], byVol = {};
-  m.list.forEach(function(o) {
-    var mt = o.unit.match(/^(.+冊)\s*(.+)$/);
-    var v = mt ? mt[1] : '其他';
-    if (!byVol[v]) { byVol[v] = []; vols.push(v); }
-    byVol[v].push(o);
-  });
-  return { vols: vols, byVol: byVol };
-}
 function btnCard_(title, color, hint, btns) {
   return { type: 'flex', altText: title, contents: { type: 'bubble',
     header: { type: 'box', layout: 'vertical', backgroundColor: color,
@@ -1062,137 +905,6 @@ function btnCard_(title, color, hint, btns) {
     body: { type: 'box', layout: 'vertical',
       contents: [{ type: 'text', text: hint, size: 'sm', color: '#333333', wrap: true }] },
     footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: btns } } };
-}
-function opStatus_(op) { return op === '完成' ? 'V' : op === '刺令' ? '已刺令' : '已領取'; }
-function pageLabel_(unit) { return unit.replace(/^.+冊\s*/, '') || unit; }
-function tUpdCards_(q) {
-  if (!q.op) {
-    return btnCard_('更新進度・選動作', '#8B7355', '第一步：選動作', ['刺令', '領取', '完成'].map(function(op) {
-      return pbBtn_(op, 'action=tupd&step=name&op=' + encodeURIComponent(op), op, 'secondary');
-    }));
-  }
-  if (!q.name) {
-    var names = Object.keys(apprenticeState_().by);
-    if (!names.length) return textCard_('無徒弟資料', '#B04A3A', '訓練紀錄是空的，請直接打字：領取 姓名 單元');
-    return btnCard_('更新進度・選人（' + q.op + '）', '#8B7355', '第二步：選徒弟（新人直接打字：' + q.op + ' 姓名 單元）', names.slice(0, 10).map(function(nm) {
-      return pbBtn_(nm, 'action=tupd&step=vol&op=' + encodeURIComponent(q.op) + '&name=' + encodeURIComponent(nm), q.op + ' ' + nm, 'secondary');
-    }));
-  }
-  if (!q.vol && q.step !== 'done') {
-    var sv = sopVolumes_();
-    if (!sv.vols.length) return textCard_('無SOP資料', '#B04A3A', 'SOP表是空的');
-    return btnCard_('更新進度・選冊', '#8B7355', '第三步：選冊', sv.vols.map(function(v) {
-      return pbBtn_(v, 'action=tupd&step=unit&op=' + encodeURIComponent(q.op) + '&name=' + encodeURIComponent(q.name) + '&vol=' + encodeURIComponent(v), v, 'secondary');
-    }));
-  }
-  if (!q.unit) {
-    var sv2 = sopVolumes_();
-    var list = sv2.byVol[q.vol] || [];
-    if (!list.length) return textCard_('無此冊', '#B04A3A', q.vol);
-    return btnCard_('更新進度・選單元', '#8B7355', '第四步：選單元（括號內為現庫存）', list.slice(0, 20).map(function(o) {
-      return pbBtn_(pageLabel_(o.unit) + '(庫' + (o.b + o.c) + ')',
-        'action=tupd&step=done&op=' + encodeURIComponent(q.op) + '&name=' + encodeURIComponent(q.name) + '&unit=' + encodeURIComponent(o.unit),
-        q.op + ' ' + q.name + ' ' + o.unit, 'secondary');
-    }));
-  }
-  return setTrain_(q.name, q.unit, opStatus_(q.op));
-}
-function tAddCards_(q) {
-  if (!q.kind) {
-    return btnCard_('補庫存・選種類', '#8B7355', '第一步：選種類', [
-      pbBtn_('蓋章+1', 'action=tadd&step=vol&kind=C', '補庫存 蓋章', 'primary', '#8B7355'),
-      pbBtn_('列印+1', 'action=tadd&step=vol&kind=B', '補庫存 列印', 'secondary')
-    ]);
-  }
-  if (!q.vol && q.step !== 'done') {
-    var sv = sopVolumes_();
-    if (!sv.vols.length) return textCard_('無SOP資料', '#B04A3A', 'SOP表是空的');
-    return btnCard_('補庫存・選冊', '#8B7355', '第二步：選冊', sv.vols.map(function(v) {
-      return pbBtn_(v, 'action=tadd&step=unit&kind=' + q.kind + '&vol=' + encodeURIComponent(v), v, 'secondary');
-    }));
-  }
-  if (!q.unit) {
-    var sv2 = sopVolumes_();
-    var list = sv2.byVol[q.vol] || [];
-    if (!list.length) return textCard_('無此冊', '#B04A3A', q.vol);
-    return btnCard_('補庫存・選單元', '#8B7355', '第三步：選單元', list.slice(0, 20).map(function(o) {
-      return pbBtn_(pageLabel_(o.unit) + '(庫' + (o.b + o.c) + ')',
-        'action=tadd&step=done&kind=' + q.kind + '&unit=' + encodeURIComponent(o.unit),
-        '補庫存 ' + o.unit, 'secondary');
-    }));
-  }
-  ensureTrainSheets_();
-  var mm = sopMap_().map[norm_(q.unit)];
-  if (!mm) return textCard_('找不到單元', '#B04A3A', q.unit);
-  var isC = q.kind === 'C';
-  var newB = isC ? mm.b : mm.b + 1, newC = isC ? mm.c + 1 : mm.c;
-  sheetByName_(SHEET_SOP).getRange(mm.row, isC ? 3 : 2).setValue(isC ? newC : newB);
-  return textCard_('已補庫存', '#4A7C59', mm.unit + ' ' + (isC ? '蓋章' : '列印') + '+1（現印' + newB + '章' + newC + '）');
-}
-function handleTrainPostback_(data) {
-  var q = {};
-  String(data || '').split('&').forEach(function(kv) {
-    var p = kv.split('=');
-    if (p[0]) q[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || '');
-  });
-  if (q.action === 'progress') return trainOverview_();
-  if (q.action === 'stock') return stockText_();
-  if (q.action === 'list') return listCases_('未結案');
-  if (q.action === 'tupd') return tUpdCards_(q);
-  if (q.action === 'tadd') return tAddCards_(q);
-  if (q.action === 'menu') return q.go === 'train' ? trainMenuCard_() : consultMenuCard_();
-  if (q.action === 'caselist') return caseListCard_(q.filter || '未結案');
-  if (q.action === 'case') return caseCard_(q.caseId);
-  if (q.action === 'casestatus') return doCaseStatus_(q.caseId, q.to);
-  if ((q.action === 'claim' || q.action === 'done' || q.action === 'sting') && q.name && q.unit) {
-    return setTrain_(q.name, q.unit, q.action === 'done' ? 'V' : q.action === 'sting' ? '已刺令' : '已領取');
-  }
-  if (q.action === 'addStock' && q.unit && q.kind) {
-    ensureTrainSheets_();
-    var mm = sopMap_().map[norm_(q.unit)];
-    if (!mm) return textCard_('找不到單元', '#B04A3A', q.unit);
-    var sh = sheetByName_(SHEET_SOP);
-    sh.getRange(mm.row, q.kind === 'C' ? 3 : 2).setValue((q.kind === 'C' ? mm.c : mm.b) + 1);
-    return textCard_('已補庫存', '#4A7C59', q.unit + ' ' + (q.kind === 'C' ? '蓋章+1' : '列印+1'));
-  }
-  return null;
-}
-function dailyTrainAlert_() {
-  try {
-    ensureTrainSheets_();
-    var m = sopMap_();
-    if (!m.list.length) return;
-    var pos = {}; m.list.forEach(function(o) { pos[o.key] = o.idx; });
-    var rows = trainRows_().rows;
-    var by = {};
-    rows.forEach(function(r) {
-      var nm = String(r[1]).trim(); if (!nm) return;
-      var st = norm_(r[3]);
-      var un = norm_(r[2]);
-      var tm = new Date(r[4]).getTime(); if (isNaN(tm)) return;
-      var g = by[nm] || (by[nm] = { n: 0, earliest: Infinity, latestIdx: -1 });
-      if (st === '已領取') { g.n++; if (tm < g.earliest) g.earliest = tm; }
-      if ((st === '已領取' || st === 'V' || st === 'v') && pos[un] !== undefined && pos[un] > g.latestIdx) g.latestIdx = pos[un];
-    });
-    var now = Date.now();
-    var out = [];
-    Object.keys(by).forEach(function(nm) {
-      var g = by[nm];
-      if (!g.n || g.earliest === Infinity || g.latestIdx < 0) return;
-      var passed = Math.floor((now - g.earliest) / 86400000);
-      var th = (g.n - 1) * 31 + 25;
-      if (passed < th) return;
-      var warns = [];
-      var t1 = m.list[g.latestIdx + 1], t2 = m.list[g.latestIdx + 2], t3 = m.list[g.latestIdx + 3];
-      var t1hit = false, t2hit = false;
-      if (t1 && (t1.b + t1.c) < 1) { warns.push('下一關 ' + t1.unit + ' 無庫存'); t1hit = true; }
-      if (t2 && (t2.b + t2.c) < 1 && ((passed - th) % 5 === 0)) { warns.push('下下關 ' + t2.unit + ' 無庫存'); t2hit = true; }
-      if ((t1hit || t2hit) && t3 && (t3.b + t3.c) < 1) warns.push('（另：' + t3.unit + '亦無庫存）');
-      if (warns.length) out.push(nm + '｜N=' + g.n + '｜D' + passed + '：' + warns.join('；'));
-    });
-    if (!out.length) return;
-    pushLine_(targetGroup_(), flexCard_('備課提醒', '#B04A3A', [['缺漏', out.slice(0, 10).join('\n').slice(0, 1400)]], null));
-  } catch (err) { try { mailAdmin_('備課提醒失敗 ' + err, ''); } catch (e2) {} }
 }
 
 function lineProfile_(uid) {
@@ -1313,8 +1025,8 @@ function diagPush() {
   var gid = 'Ue63699996ba4fdaef1bd1f2964b37fd0';
   Logger.log('gid=' + gid);
   try {
-    // pushLine_(gid, textCard_('敷籙功曹降臨！', '#8B7355', '本神官已感應到貴客的疑惑？！\n\n請依照古禮選擇『香』『花』『燈』『果』四禮其中之一，奉獻於吾，請教貴客要選哪一個'));
-    pushLine_(gid, textCard_('敷籙功曹降臨！', '#8B7355', '本神官已感應到貴客的到來？！\n\n請依照古禮選擇『香』『花』『燈』『果』四禮其中之一，奉獻於吾，請教貴客要選哪一個'));
+    // pushLine_(gid, textCard_('敷籙功曹降臨！', '#8B7355', '本神官已感應到貴客的疑惑？！\n\n請依照古禮選擇『香』『花』『果』三禮其中之一，奉獻於吾，請教貴客要選哪一個'));
+    pushLine_(gid, textCard_('敷籙功曹降臨！', '#8B7355', '本神官已感應到貴客的到來？！\n\n請依照古禮選擇『香』『花』『果』三禮其中之一，奉獻於吾，請教貴客要選哪一個'));
     Logger.log('push ok');
   } catch (e) { Logger.log('push FAIL: ' + e); }
 }
@@ -1340,19 +1052,7 @@ function diagPush_game() {
       return;
     }
 
-    // 2. 從「遊戲設定」工作表讀取開場白與按鈕
-    var settings = getGameSettings_();
-    var opts = [];
-    for (var i = 1; i <= 4; i++) {
-      if (settings['選項' + i]) opts.push(settings['選項' + i]);
-    }
-    
-    // 建立選項按鈕
-    var btns = opts.map(function(o) { 
-      return pbBtn_(o, 'action=game_opt&choice=' + encodeURIComponent(o), o, 'secondary'); 
-    });
-    
-    // 組裝帶有按鈕的卡片 (使用 btnCard_)
+    // 2. 組裝帶有按鈕的卡片 (使用 getGameCard_，按鈕已含 game 參數)
     var card = getGameCard_();
 
     // 3. 逐一推播給所有有效用戶
