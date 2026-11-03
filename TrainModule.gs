@@ -115,31 +115,48 @@ function trainOverview_() {
   var s = apprenticeState_();
   var names = Object.keys(s.by);
   if (!names.length) return { card: textCard_('全體進度', '#8B7355', '訓練紀錄無資料'), copy: null };
-  var lines = names.map(function(nm) {
+  var show = names.slice(0, 15);
+  var contents = [];
+  show.forEach(function(nm, idx) {
     var g = s.by[nm];
+    var summary = '';
+    var nextLine = '';
     if (!g.active) {
-      if (g.done > 0 && g.latestIdx >= 0 && g.latestIdx >= s.sop.list.length - 1) return nm + '｜完訓（共完' + g.done + '）';
-      return nm + '｜⚠LOSS（無進行中，完' + g.done + '）';
+      if (g.done > 0 && g.latestIdx >= 0 && g.latestIdx >= s.sop.list.length - 1) {
+        summary = nm + '｜完訓（共完' + g.done + '）';
+      } else {
+        summary = nm + '｜⚠LOSS（無進行中，完' + g.done + '）';
+      }
+    } else {
+      var nu = s.sop.list[g.latestIdx + 1];
+      var nxt = '完訓';
+      if (nu) {
+        var tags = [];
+        if (g.stung[nu.key]) tags.push('已刺令');
+        if (nu.c > 0) tags.push('蓋章' + nu.c);
+        else if (nu.b > 0) tags.push('列印' + nu.b);
+        else tags.push('未備料');
+        nxt = nu.unit + '(' + tags.join('/') + ')';
+      }
+      summary = nm + '｜完成' + g.done + '/進行中' + g.active + '｜' + g.units.join('、');
+      nextLine = '    下:' + nxt;
     }
-    var nu = s.sop.list[g.latestIdx + 1];
-    var nxt = '完訓';
-    if (nu) {
-      var tags = [];
-      if (g.stung[nu.key]) tags.push('已刺令');
-      if (nu.c > 0) tags.push('蓋章' + nu.c);
-      else if (nu.b > 0) tags.push('列印' + nu.b);
-      else tags.push('未備料');
-      nxt = nu.unit + '(' + tags.join('/') + ')';
-    }
-    return nm + '｜完成' + g.done + '/進行中' + g.active + '｜' + g.units.join('、').slice(0, 80) + '｜下:' + nxt;
+    var boxContents = [{ type: 'text', text: summary, size: 'sm', color: '#333333', wrap: true }];
+    if (nextLine) boxContents.push({ type: 'text', text: nextLine, size: 'sm', color: '#777777', wrap: true, margin: 'xs' });
+    contents.push({ type: 'box', layout: 'vertical', margin: idx > 0 ? 'lg' : 'none', contents: boxContents });
+    if (idx < show.length - 1) contents.push({ type: 'separator', margin: 'md' });
   });
-  return { card: textCard_('全體進度共' + names.length + '人', '#8B7355', lines.slice(0, 15).join('\n')), copy: null };
+  var card = { type: 'flex', altText: '全體進度', contents: { type: 'bubble',
+    header: { type: 'box', layout: 'vertical', backgroundColor: '#8B7355', contents: [{ type: 'text', text: '全體進度共' + show.length + '人', size: 'md', color: '#ffffff', weight: 'bold', wrap: true }] },
+    body: { type: 'box', layout: 'vertical', spacing: 'md', contents: contents }
+  }};
+  return { card: card, copy: null };
 }
 
 function stockText_() {
   var s = apprenticeState_();
   var m = s.sop;
-  if (!m.list.length) return { card: textCard_('庫存', '#8B7355', 'SOP表無資料'), copy: null };
+  if (!m.list.length) return textCard_('庫存', '#8B7355', 'SOP表無資料');
   var dem = {}, i, g, k;
   var names = Object.keys(s.by);
   var contributors = [];
@@ -157,16 +174,29 @@ function stockText_() {
   if (!keys.length) {
     var hasActive = names.some(function(nm) { return s.by[nm].active > 0; });
     if (hasActive && s.unmatched.length) {
-      return { card: textCard_('單元名稱對不上', '#B04A3A', '紀錄：' + s.unmatched.join('、') + '\nSOP首筆：' + m.list[0].unit + '\n請兩邊用完全相同名稱'), copy: null };
+      return textCard_('單元名稱對不上', '#B04A3A', '紀錄：' + s.unmatched.join('、') + '\nSOP首筆：' + m.list[0].unit + '\n請兩邊用完全相同名稱');
     }
     var minLatest = Infinity;
     names.forEach(function(nm) { var li = s.by[nm].latestIdx; if (li >= 0 && li < minLatest) minLatest = li; });
     var zero = m.list.filter(function(o) { return (o.b + o.c) < 1 && (minLatest === Infinity || o.idx > minLatest); });
-    if (!zero.length) return { card: textCard_('庫存', '#4A7C59', '目前無進行中徒弟，且全關都有庫存'), copy: null };
-    return { card: textCard_('待補庫存' + zero.length + '關', '#B04A3A', zero.slice(0, 15).map(function(o) { return o.unit + '｜庫0'; }).join('\n')), copy: null };
+    if (!zero.length) return textCard_('庫存', '#4A7C59', '目前無進行中徒弟，且全關都有庫存');
+    var maxZ = 0;
+    zero.forEach(function(o) { var l = pageLabel_(o.unit).length; if (l > maxZ) maxZ = l; });
+    var zlines = zero.slice(0, 15).map(function(o) {
+      var label = pageLabel_(o.unit);
+      while (label.length < maxZ) label += ' ';
+      return label + '｜庫0（印' + o.b + '/章' + o.c + '）';
+    });
+    return textCard_('待補庫存' + zero.length + '關', '#B04A3A', zlines.join('\n'));
   }
   keys.sort(function(a, b) { return m.map[a].idx - m.map[b].idx; });
   var lines = [];
+  var maxLen = 0;
+  keys.forEach(function(key) {
+    var o = m.map[key];
+    var l = pageLabel_(o.unit).length;
+    if (l > maxLen) maxLen = l;
+  });
   keys.forEach(function(key) {
     var o = m.map[key];
     var need = 0, j;
@@ -174,10 +204,13 @@ function stockText_() {
     if (need <= 0) return;
     var stock = o.b + o.c;
     var lack = Math.max(0, need - stock);
-    lines.push(o.unit + '｜需' + need + '｜庫' + stock + (lack > 0 ? '｜缺' + lack : '｜夠'));
+    var label = pageLabel_(o.unit);
+    while (label.length < maxLen) label += ' ';
+    lines.push(label + '｜庫' + stock + '（印' + o.b + '/章' + o.c + '）｜需' + need + '｜缺' + lack);
+    lines.push('──────────────');
   });
-  if (!lines.length) return { card: textCard_('庫存', '#4A7C59', '3關內人人都有料，不用補'), copy: null };
-  return { card: textCard_('3關內需求（' + contributors.length + '人）', '#8B7355', lines.slice(0, 15).join('\n')), copy: null };
+  if (!lines.length) return textCard_('庫存', '#4A7C59', '3關內人人都有料，不用補');
+  return { card: textCard_('3關內需求（' + contributors.length + '人）', '#8B7355', lines.join('\n')), copy: null };
 }
 
 function sopVolumes_() {
@@ -351,30 +384,12 @@ function dailyTrainAlert_() {
 
 // ===== 庫存盤點 / 確認 =====
 function stockCheckAll_() {
-  var s = apprenticeState_();
-  var m = s.sop;
-  if (!m.list.length) return { card: textCard_('庫存盤點', '#8B7355', 'SOP表無資料'), copy: null };
   var sv = sopVolumes_();
-  var vols = sv.vols;
-  var byVol = sv.byVol;
-  var lines = [];
-  var names = Object.keys(s.by);
-  vols.forEach(function(v) {
-    lines.push('【' + v + '】');
-    (byVol[v] || []).forEach(function(o) {
-      var need = 0;
-      for (var i = 0; i < names.length; i++) {
-        var g = s.by[names[i]];
-        if (!g.active) continue;
-        if (!g.have[o.key]) need++;
-      }
-      var stock = o.b + o.c;
-      var lack = Math.max(0, need - stock);
-      lines.push('  ' + pageLabel_(o.unit) + '｜庫' + stock + '（印' + o.b + '/章' + o.c + '）｜需' + need + '｜缺' + lack);
-    });
+  if (!sv.vols.length) return textCard_('庫存盤點', '#8B7355', 'SOP表無資料');
+  var btns = sv.vols.map(function(v) {
+    return pbBtn_(v, 'action=stockcheckvol&vol=' + encodeURIComponent(v), '\u200b', 'secondary');
   });
-  var body = lines.join('\n').slice(0, 1500);
-  return { card: textCard_('庫存盤點', '#8B7355', body), copy: body };
+  return btnCard_('庫存盤點', '#8B7355', '選擇冊別查看庫存盤點（共 ' + sv.vols.length + ' 冊）', btns);
 }
 
 function stockCheckVol_(vol) {
@@ -383,6 +398,8 @@ function stockCheckVol_(vol) {
   var list = sv.byVol[vol];
   if (!list || !list.length) return textCard_('無此冊', '#B04A3A', vol);
   var names = Object.keys(s.by);
+  var maxLen = 0;
+  list.forEach(function(o) { var l = pageLabel_(o.unit).length; if (l > maxLen) maxLen = l; });
   var lines = ['【' + vol + '】'];
   list.forEach(function(o) {
     var need = 0;
@@ -393,7 +410,10 @@ function stockCheckVol_(vol) {
     }
     var stock = o.b + o.c;
     var lack = Math.max(0, need - stock);
-    lines.push(pageLabel_(o.unit) + '｜庫' + stock + '（印' + o.b + '/章' + o.c + '）｜需' + need + '｜缺' + lack);
+    var label = pageLabel_(o.unit);
+    while (label.length < maxLen) label += ' ';
+    lines.push(label + '｜庫' + stock + '（印' + o.b + '/章' + o.c + '）｜需' + need + '｜缺' + lack);
+    lines.push('──────────────');
   });
   return textCard_('庫存盤點・' + vol, '#8B7355', lines.join('\n'));
 }
