@@ -190,13 +190,7 @@ function stockText_() {
     return textCard_('待補庫存' + zero.length + '關', '#B04A3A', zlines.join('\n'));
   }
   keys.sort(function(a, b) { return m.map[a].idx - m.map[b].idx; });
-  var lines = [];
-  var maxLen = 0;
-  keys.forEach(function(key) {
-    var o = m.map[key];
-    var l = pageLabel_(o.unit).length;
-    if (l > maxLen) maxLen = l;
-  });
+  var rows = [];
   keys.forEach(function(key) {
     var o = m.map[key];
     var need = 0, j;
@@ -205,12 +199,20 @@ function stockText_() {
     var stock = o.b + o.c;
     var lack = Math.max(0, need - stock);
     var label = pageLabel_(o.unit);
-    while (label.length < maxLen) label += ' ';
-    lines.push(label + '｜庫' + stock + '（印' + o.b + '/章' + o.c + '）｜需' + need + '｜缺' + lack);
-    lines.push('──────────────');
+    rows.push({ type: 'box', layout: 'horizontal', margin: rows.length > 0 ? 'sm' : 'none', contents: [
+      { type: 'text', text: label, size: 'sm', color: '#333333', flex: 2, wrap: true },
+      { type: 'text', text: '庫' + stock + '（印' + o.b + '/章' + o.c + '）', size: 'sm', color: '#333333', flex: 4, wrap: true },
+      { type: 'text', text: '需' + need, size: 'sm', color: '#333333', flex: 1, wrap: true },
+      { type: 'text', text: '缺' + lack, size: 'sm', color: lack > 0 ? '#B04A3A' : '#4A7C59', flex: 1, wrap: true }
+    ]});
+    rows.push({ type: 'separator', margin: 'xs' });
   });
-  if (!lines.length) return textCard_('庫存', '#4A7C59', '3關內人人都有料，不用補');
-  return { card: textCard_('3關內需求（' + contributors.length + '人）', '#8B7355', lines.join('\n')), copy: null };
+  if (!rows.length) return textCard_('庫存', '#4A7C59', '3關內人人都有料，不用補');
+  var card = { type: 'flex', altText: '3關內需求', contents: { type: 'bubble',
+    header: { type: 'box', layout: 'vertical', backgroundColor: '#8B7355', contents: [{ type: 'text', text: '3關內需求（' + contributors.length + '人）', size: 'md', color: '#ffffff', weight: 'bold', wrap: true }] },
+    body: { type: 'box', layout: 'vertical', spacing: 'xs', contents: rows.slice(0, 30) }
+  }};
+  return card;
 }
 
 function sopVolumes_() {
@@ -313,7 +315,7 @@ function handleTrainPostback_(data) {
   if (q.action === 'progress') return trainOverview_();
   if (q.action === 'stock') return stockText_();
   if (q.action === 'stockcheck') return stockCheckAll_();
-  if (q.action === 'stockcheckvol' && q.vol) return stockCheckVol_(decodeURIComponent(q.vol));
+  if (q.action === 'stockcheckvol' && q.vol) return stockCheckVol_(q.vol);
   if (q.action === 'list') return listCases_('未結案');
   if (q.action === 'tupd') return tUpdCards_(q);
   if (q.action === 'tadd') return tAddCards_(q);
@@ -387,7 +389,7 @@ function stockCheckAll_() {
   var sv = sopVolumes_();
   if (!sv.vols.length) return textCard_('庫存盤點', '#8B7355', 'SOP表無資料');
   var btns = sv.vols.map(function(v) {
-    return pbBtn_(v, 'action=stockcheckvol&vol=' + encodeURIComponent(v), '\u200b', 'secondary');
+    return pbBtn_(v, 'action=stockcheckvol&vol=' + encodeURIComponent(v), '盤點 ' + v, 'secondary');
   });
   return btnCard_('庫存盤點', '#8B7355', '選擇冊別查看庫存盤點（共 ' + sv.vols.length + ' 冊）', btns);
 }
@@ -398,10 +400,8 @@ function stockCheckVol_(vol) {
   var list = sv.byVol[vol];
   if (!list || !list.length) return textCard_('無此冊', '#B04A3A', vol);
   var names = Object.keys(s.by);
-  var maxLen = 0;
-  list.forEach(function(o) { var l = pageLabel_(o.unit).length; if (l > maxLen) maxLen = l; });
-  var lines = ['【' + vol + '】'];
-  list.forEach(function(o) {
+  var rows = [];
+  list.forEach(function(o, idx) {
     var need = 0;
     for (var i = 0; i < names.length; i++) {
       var g = s.by[names[i]];
@@ -411,11 +411,19 @@ function stockCheckVol_(vol) {
     var stock = o.b + o.c;
     var lack = Math.max(0, need - stock);
     var label = pageLabel_(o.unit);
-    while (label.length < maxLen) label += ' ';
-    lines.push(label + '｜庫' + stock + '（印' + o.b + '/章' + o.c + '）｜需' + need + '｜缺' + lack);
-    lines.push('──────────────');
+    rows.push({ type: 'box', layout: 'horizontal', margin: idx > 0 ? 'sm' : 'none', contents: [
+      { type: 'text', text: label, size: 'sm', color: '#333333', flex: 2, wrap: true },
+      { type: 'text', text: '庫' + stock + '（印' + o.b + '/章' + o.c + '）', size: 'sm', color: '#333333', flex: 4, wrap: true },
+      { type: 'text', text: '需' + need, size: 'sm', color: '#333333', flex: 1, wrap: true },
+      { type: 'text', text: '缺' + lack, size: 'sm', color: lack > 0 ? '#B04A3A' : '#4A7C59', flex: 1, wrap: true }
+    ]});
+    rows.push({ type: 'separator', margin: 'xs' });
   });
-  return textCard_('庫存盤點・' + vol, '#8B7355', lines.join('\n'));
+  var card = { type: 'flex', altText: '庫存盤點・' + vol, contents: { type: 'bubble',
+    header: { type: 'box', layout: 'vertical', backgroundColor: '#8B7355', contents: [{ type: 'text', text: '庫存盤點・' + vol, size: 'md', color: '#ffffff', weight: 'bold', wrap: true }] },
+    body: { type: 'box', layout: 'vertical', spacing: 'xs', contents: rows }
+  }};
+  return card;
 }
 
 function setStock_(unit, kind, qty) {
