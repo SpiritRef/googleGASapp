@@ -155,76 +155,80 @@ function trainOverview_() {
 
 function stockText_() {
   try {
-  var m = sopMap_();
+  var s = apprenticeState_();
+  var m = s.sop;
   if (!m.list.length) return textCard_('庫存', '#8B7355', 'SOP表無資料');
 
-  // 建立「單元 -> 已領取人名」對照
+  // 建立「單元 -> 已領取人名」對照（本次新增功能）
   var claimers = {};
   var tr = trainRows_().rows;
-  for (var i = 0; i < tr.length; i++) {
-    var r = tr[i];
-    if (norm_(r[3]) !== '已領取') continue;
-    var uk = norm_(r[2]);
-    var nm = String(r[1]).trim();
+  for (var ci = 0; ci < tr.length; ci++) {
+    var rr = tr[ci];
+    if (norm_(rr[3]) !== '已領取') continue;
+    var uk = norm_(rr[2]);
+    var nm = String(rr[1]).trim();
     if (!claimers[uk]) claimers[uk] = [];
     if (claimers[uk].indexOf(nm) === -1) claimers[uk].push(nm);
   }
 
-  // 計算 3 關內需求（用於 需/缺）
-  var s2 = apprenticeState_();
-  var names = Object.keys(s2.by);
+  var dem = {}, i, g, k;
+  var names = Object.keys(s.by);
   var contributors = [];
-  for (var i = 0; i < names.length; i++) {
-    var g = s2.by[names[i]];
+  for (i = 0; i < names.length; i++) {
+    g = s.by[names[i]];
     if (!g.active || g.latestIdx < 0) continue;
     contributors.push(names[i]);
-  }
-  var dem = {};
-  for (var i = 0; i < contributors.length; i++) {
-    var g = s2.by[contributors[i]];
-    for (var k = 1; k <= 3; k++) {
+    for (k = 1; k <= 3; k++) {
       var o = m.list[g.latestIdx + k];
       if (!o) break;
       dem[o.key] = true;
     }
   }
-
-  var sv = sopVolumes_();
-  var rows = [];
-  sv.vols.forEach(function(v) {
-    rows.push({ type: 'text', text: '【' + v + '】', size: 'sm', color: '#8B7355', weight: 'bold', wrap: true, margin: rows.length > 0 ? 'sm' : 'none' });
-    (sv.byVol[v] || []).forEach(function(o) {
-      var need = 0;
-      if (dem[o.key]) {
-        for (var j = 0; j < contributors.length; j++) {
-          if (!s2.by[contributors[j]].have[o.key]) need++;
-        }
-      }
-      var stock = o.b + o.c;
-      var lack = Math.max(0, need - stock);
-      var c = claimers[norm_(o.unit)] || [];
-      var namesStr = c.length ? c.join('、') : '';
+  var keys = Object.keys(dem);
+  if (!keys.length) {
+    var hasActive = names.some(function(nm) { return s.by[nm].active > 0; });
+    if (hasActive && s.unmatched.length) {
+      return textCard_('單元名稱對不上', '#B04A3A', '紀錄：' + s.unmatched.join('、') + '\nSOP首筆：' + m.list[0].unit + '\n請兩邊用完全相同名稱');
+    }
+    var minLatest = Infinity;
+    names.forEach(function(nm) { var li = s.by[nm].latestIdx; if (li >= 0 && li < minLatest) minLatest = li; });
+    var zero = m.list.filter(function(o) { return (o.b + o.c) < 1 && (minLatest === Infinity || o.idx > minLatest); });
+    if (!zero.length) return textCard_('庫存', '#4A7C59', '目前無進行中徒弟，且全關都有庫存');
+    var maxZ = 0;
+    zero.forEach(function(o) { var l = pageLabel_(o.unit).length; if (l > maxZ) maxZ = l; });
+    var zlines = zero.slice(0, 15).map(function(o) {
       var label = pageLabel_(o.unit);
-      // 避免 LINE Flex 要求 text 不可為空字串而整則訊息被拒（無人領取時顯示 '—'）
-      var safeNames = namesStr || '—';
-      rows.push({ type: 'box', layout: 'horizontal', margin: 'xs', contents: [
-        { type: 'text', text: label, size: 'xs', color: '#333333', flex: 2, wrap: true },
-        { type: 'text', text: '庫' + stock + '（印' + o.b + '/章' + o.c + '）', size: 'xs', color: '#333333', flex: 3, wrap: true },
-        { type: 'text', text: '需' + need, size: 'xs', color: '#333333', flex: 1, wrap: true },
-        { type: 'text', text: '缺' + lack, size: 'xs', color: lack > 0 ? '#B04A3A' : '#4A7C59', flex: 1, wrap: true },
-        { type: 'text', text: safeNames, size: 'xs', color: '#555555', flex: 3, wrap: true }
-      ]});
+      while (label.length < maxZ) label += ' ';
+      return label + '｜庫0（印' + o.b + '/章' + o.c + '）';
     });
-  });
-
-  var bodyContents = rows;
-  if (bodyContents.length > 80) {
-    bodyContents = bodyContents.slice(0, 80);
-    bodyContents.push({ type: 'text', text: '…（資料過多，僅顯示前 80 筆）', size: 'xs', color: '#999999', wrap: true, margin: 'sm' });
+    return textCard_('待補庫存' + zero.length + '關', '#B04A3A', zlines.join('\n'));
   }
-  var card = { type: 'flex', altText: '庫存查詢', contents: { type: 'bubble',
-    header: { type: 'box', layout: 'vertical', backgroundColor: '#8B7355', contents: [{ type: 'text', text: '庫存查詢', size: 'md', color: '#ffffff', weight: 'bold', wrap: true }] },
-    body: { type: 'box', layout: 'vertical', spacing: 'xs', contents: bodyContents }
+  keys.sort(function(a, b) { return m.map[a].idx - m.map[b].idx; });
+  var rows = [];
+  keys.forEach(function(key) {
+    var o = m.map[key];
+    var need = 0, j;
+    for (j = 0; j < contributors.length; j++) { if (!s.by[contributors[j]].have[key]) need++; }
+    if (need <= 0) return;
+    var stock = o.b + o.c;
+    var lack = Math.max(0, need - stock);
+    var label = pageLabel_(o.unit);
+    var c = claimers[norm_(o.unit)] || [];
+    var namesStr = c.length ? c.join('、') : '';
+    var safeNames = namesStr || '—';
+    rows.push({ type: 'box', layout: 'horizontal', margin: rows.length > 0 ? 'sm' : 'none', spacing: 'none', contents: [
+      { type: 'text', text: label, size: 'sm', color: '#333333', flex: 2, wrap: true, margin: 'none' },
+      { type: 'text', text: '庫' + stock + '（印' + o.b + '/章' + o.c + '）', size: 'sm', color: '#333333', flex: 6, wrap: false, margin: 'none', adjustMode: 'shrink-to-fit' },
+      { type: 'text', text: '需' + need, size: 'sm', color: '#333333', flex: 1, wrap: true, margin: 'none' },
+      { type: 'text', text: '缺' + lack, size: 'sm', color: lack > 0 ? '#B04A3A' : '#4A7C59', flex: 1, wrap: true, margin: 'none' },
+      { type: 'text', text: safeNames, size: 'sm', color: '#555555', flex: 2, wrap: true, margin: 'none' }
+    ]});
+    rows.push({ type: 'separator', margin: 'xs' });
+  });
+  if (!rows.length) return textCard_('庫存', '#4A7C59', '3關內人人都有料，不用補');
+  var card = { type: 'flex', altText: '3關內需求', contents: { type: 'bubble',
+    header: { type: 'box', layout: 'vertical', backgroundColor: '#8B7355', contents: [{ type: 'text', text: '3關內需求（' + contributors.length + '人）', size: 'md', color: '#ffffff', weight: 'bold', wrap: true }] },
+    body: { type: 'box', layout: 'vertical', spacing: 'xs', contents: rows.slice(0, 30) }
   }};
   return card;
   } catch (e) { return textCard_('庫存查詢錯誤', '#B04A3A', String(e)); }
