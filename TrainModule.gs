@@ -205,12 +205,14 @@ function stockText_() {
       var c = claimers[norm_(o.unit)] || [];
       var namesStr = c.length ? c.join('、') : '';
       var label = pageLabel_(o.unit);
+      // 避免 LINE Flex 要求 text 不可為空字串而整則訊息被拒（無人領取時顯示 '—'）
+      var safeNames = namesStr || '—';
       rows.push({ type: 'box', layout: 'horizontal', margin: 'xs', contents: [
         { type: 'text', text: label, size: 'xs', color: '#333333', flex: 2, wrap: true },
         { type: 'text', text: '庫' + stock + '（印' + o.b + '/章' + o.c + '）', size: 'xs', color: '#333333', flex: 3, wrap: true },
         { type: 'text', text: '需' + need, size: 'xs', color: '#333333', flex: 1, wrap: true },
         { type: 'text', text: '缺' + lack, size: 'xs', color: lack > 0 ? '#B04A3A' : '#4A7C59', flex: 1, wrap: true },
-        { type: 'text', text: namesStr, size: 'xs', color: '#555555', flex: 3, wrap: true }
+        { type: 'text', text: safeNames, size: 'xs', color: '#555555', flex: 3, wrap: true }
       ]});
     });
   });
