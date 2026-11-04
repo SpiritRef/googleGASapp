@@ -132,10 +132,13 @@ function trainOverview_() {
       var nxt = '完訓';
       if (nu) {
         var tags = [];
-        if (g.stung[nu.key]) tags.push('已刺令');
-        if (nu.c > 0) tags.push('蓋章' + nu.c);
-        else if (nu.b > 0) tags.push('列印' + nu.b);
-        else tags.push('未備料');
+        if (g.stung[nu.key]) {
+          tags.push('已刺令');
+        } else {
+          if (nu.c > 0) tags.push('蓋章' + nu.c);
+          else if (nu.b > 0) tags.push('列印' + nu.b);
+          else tags.push('未備料');
+        }
         nxt = nu.unit + '(' + tags.join('/') + ')';
       }
       summary = nm + '｜完成' + g.done + '/進行中' + g.active + '｜' + g.units.join('、');
@@ -253,7 +256,7 @@ function tUpdCards_(q) {
   if (!q.vol && q.step !== 'done') {
     var sv = sopVolumes_();
     if (!sv.vols.length) return textCard_('無SOP資料', '#B04A3A', 'SOP表是空的');
-    return btnCard_('更新進度・選冊', '#8B7355', '第三步：選冊', sv.vols.map(function(v) {
+    return btnCard_('更新進度・選冊 (' + q.name + ')', '#8B7355', '第三步：選冊', sv.vols.map(function(v) {
       return pbBtn_(v, 'action=tupd&step=unit&op=' + encodeURIComponent(q.op) + '&name=' + encodeURIComponent(q.name) + '&vol=' + encodeURIComponent(v), v, 'secondary');
     }));
   }
@@ -261,7 +264,18 @@ function tUpdCards_(q) {
     var sv2 = sopVolumes_();
     var list = sv2.byVol[q.vol] || [];
     if (!list.length) return textCard_('無此冊', '#B04A3A', q.vol);
-    return btnCard_('更新進度・選單元', '#8B7355', '第四步：選單元（括號內為現庫存）', list.slice(0, 20).map(function(o) {
+    var st = apprenticeState_().by[q.name] || { have: {}, stung: {} };
+    return btnCard_('更新進度・選單元 (' + q.name + ' - ' + q.vol + ')', '#8B7355', '第四步：選單元（括號內為現庫存）', list.slice(0, 20).map(function(o) {
+      var uk = norm_(o.unit);
+      var hasTaken = !!st.have[uk];
+      var isStung = !!st.stung[uk];
+      var disabled = false;
+      var disabledLabel = '';
+      if (q.op === '刺令' && (hasTaken || isStung)) { disabled = true; disabledLabel = pageLabel_(o.unit) + ' (已刺令)'; }
+      if (q.op === '領取' && (hasTaken && !isStung)) { disabled = true; disabledLabel = pageLabel_(o.unit) + ' (已領取)'; }
+      if (disabled) {
+        return pbBtn_(disabledLabel, 'action=ignore', disabledLabel, 'secondary', '#cccccc');
+      }
       return pbBtn_(pageLabel_(o.unit) + '(庫' + (o.b + o.c) + ')',
         'action=tupd&step=done&op=' + encodeURIComponent(q.op) + '&name=' + encodeURIComponent(q.name) + '&unit=' + encodeURIComponent(o.unit),
         q.op + ' ' + q.name + ' ' + o.unit, 'secondary');
@@ -318,6 +332,7 @@ function handleTrainPostback_(data) {
     var p = kv.split('=');
     if (p[0]) q[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || '');
   });
+  if (q.action === 'ignore') return true;
   if (q.action === 'progress') return trainOverview_();
   if (q.action === 'stock') return stockText_();
   if (q.action === 'stockcheck') return stockCheckAll_();

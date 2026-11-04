@@ -324,6 +324,7 @@ function handleAllowedEvent_(ev) {
     if (handleGamePostback_(ev, pbData)) return;
 
     var ansPb = handleTrainPostback_(String(ev.postback.data || ''));
+    if (ansPb === true) return; // ignore 偽停用按鈕，不回覆
     if (ansPb) {
       if (ansPb.card) replyLine_(ev.replyToken, ansPb.card, ansPb.copy);
       else replyLine_(ev.replyToken, ansPb);
