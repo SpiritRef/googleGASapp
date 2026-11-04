@@ -261,14 +261,14 @@ function tUpdCards_(q) {
   if (!q.name) {
     var names = Object.keys(apprenticeState_().by);
     if (!names.length) return textCard_('無徒弟資料', '#B04A3A', '訓練紀錄是空的，請直接打字：領取 姓名 單元');
-    return btnCard_('更新進度・選人（' + q.op + '）', '#8B7355', '第二步：選徒弟（新人直接打字：' + q.op + ' 姓名 單元）', names.slice(0, 10).map(function(nm) {
+    return btnCard_('更新' + q.op + '・選人', '#8B7355', '第二步：選徒弟（新人直接打字：' + q.op + ' 姓名 單元）', names.slice(0, 10).map(function(nm) {
       return pbBtn_(nm, 'action=tupd&step=vol&op=' + encodeURIComponent(q.op) + '&name=' + encodeURIComponent(nm), q.op + ' ' + nm, 'secondary');
     }));
   }
   if (!q.vol && q.step !== 'done') {
     var sv = sopVolumes_();
     if (!sv.vols.length) return textCard_('無SOP資料', '#B04A3A', 'SOP表是空的');
-    return btnCard_('更新進度・選冊 (' + q.name + ')', '#8B7355', '第三步：選冊', sv.vols.map(function(v) {
+    return btnCard_('更新' + q.op + '・選冊 (' + q.name + ')', '#8B7355', '第三步：選冊', sv.vols.map(function(v) {
       return pbBtn_(v, 'action=tupd&step=unit&op=' + encodeURIComponent(q.op) + '&name=' + encodeURIComponent(q.name) + '&vol=' + encodeURIComponent(v), v, 'secondary');
     }));
   }
@@ -277,7 +277,7 @@ function tUpdCards_(q) {
     var list = sv2.byVol[q.vol] || [];
     if (!list.length) return textCard_('無此冊', '#B04A3A', q.vol);
     var st = apprenticeState_().by[q.name] || { have: {}, stung: {}, completed: {} };
-    return btnCard_('更新進度・選單元 (' + q.name + ' - ' + q.vol + ')', '#8B7355', '第四步：選單元（括號內為現庫存）', list.slice(0, 20).map(function(o) {
+    return btnCard_('更新' + q.op + '・選單元 (' + q.name + ' - ' + q.vol + ')', '#8B7355', '第四步：選單元（括號內為現庫存）', list.slice(0, 20).map(function(o) {
       var uk = norm_(o.unit);
       var hasTaken = !!st.have[uk];
       var isStung = !!st.stung[uk];
