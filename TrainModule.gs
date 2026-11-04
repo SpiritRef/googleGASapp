@@ -42,16 +42,26 @@ function deductStock_(unit) {
 function trainAppend_(name, unit, status) {
   ensureTrainSheets_();
   var ss = sheetByName_(SHEET_TRAIN);
-  // 防重複：相同 姓名+單元+狀態 已存在則不新增
+  // 產生 YYYYMMDD-序號 的 ID
+  var ymd = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd');
+  var maxSeq = 0;
+  // 防重複：相同 姓名+單元+狀態 已存在則不新增，同時計算當日最大序號
   try {
     var rows = ss.getDataRange().getValues();
     for (var i = 1; i < rows.length; i++) {
       if (norm_(rows[i][1]) === norm_(name) && norm_(rows[i][2]) === norm_(unit) && norm_(rows[i][3]) === norm_(status)) {
         return false;
       }
+      var m = String(rows[i][0]).match(new RegExp('^' + ymd + '-(\\\\d+)$'));
+      if (m) {
+        var n = parseInt(m[1], 10);
+        if (n > maxSeq) maxSeq = n;
+      }
     }
   } catch (e) {}
-  var id = new Date().getTime().toString(36) + Math.floor(Math.random() * 99);
+  var seq = maxSeq + 1;
+  var seqStr = (seq < 10) ? '0' + seq : String(seq);
+  var id = ymd + '-' + seqStr;
   ss.appendRow([id, name, unit, status, new Date()]);
   return true;
 }
@@ -60,7 +70,8 @@ function hasSting_(name, unit) {
   var t = trainRows_().rows;
   var nk = norm_(name), uk = norm_(unit);
   for (var i = 0; i < t.length; i++) {
-    if (norm_(t[i][1]) === nk && norm_(t[i][2]) === uk && norm_(t[i][3]) === '已刺令') return true;
+    var st = norm_(t[i][3]);
+    if (norm_(t[i][1]) === nk && norm_(t[i][2]) === uk && st === '已敕令') return true;
   }
   return false;
 }
@@ -69,11 +80,12 @@ function setTrain_(name, unit, status) {
   var m = sopMap_();
   var o = m.map[norm_(unit)];
   if (!o) return textCard_('找不到單元', '#B04A3A', unit + '（用「庫存」看正確名稱）');
-  if (status === '已刺令' || status === '已領取') {
+  if (status === '已敕令' || status === '已領取') {
     if (!hasSting_(name, unit)) {
+      var isDecree = (status === '已敕令');
       var appended = false;
-      if (status === '已刺令') appended = trainAppend_(name, o.unit, '已刺令');
-      else { var a = trainAppend_(name, o.unit, '已刺令'); var b = trainAppend_(name, o.unit, '已領取'); appended = a || b; }
+      if (isDecree) appended = trainAppend_(name, o.unit, '已敕令');
+      else { var a = trainAppend_(name, o.unit, '已敕令'); var b = trainAppend_(name, o.unit, '已領取'); appended = a || b; }
       var ok = true;
       if (appended) ok = deductStock_(o.unit);
       return textCard_('已更新', '#4A7C59', name + '・' + o.unit + '→' + status + (appended ? (ok ? '（已扣庫存）' : '（庫存不足0）') : '（重複，未重複扣庫存）'));
@@ -101,8 +113,8 @@ function apprenticeState_() {
       if (!isNaN(tm) && tm < g.earliest) g.earliest = tm;
     }
     if (st === 'V' || st === 'v') g.done++;
-    if (st === '已刺令') g.stung[uk] = true;
-    if (st === 'V' || st === 'v' || st === '已領取' || st === '已刺令') g.have[uk] = true;
+    if (st === '已敕令') g.stung[uk] = true;
+    if (st === 'V' || st === 'v' || st === '已領取' || st === '已敕令') g.have[uk] = true;
     if ((st === '已領取' || st === 'V' || st === 'v')) {
       if (uk && pos[uk] !== undefined) { if (pos[uk] > g.latestIdx) g.latestIdx = pos[uk]; }
       else if (uk && unmatched.length < 3 && unmatched.indexOf(String(r[2]).trim()) === -1) unmatched.push(String(r[2]).trim());
@@ -133,7 +145,7 @@ function trainOverview_() {
       if (nu) {
         var tags = [];
         if (g.stung[nu.key]) {
-          tags.push('已刺令');
+          tags.push('已敕令');
         } else {
           if (nu.c > 0) tags.push('蓋章' + nu.c);
           else if (nu.b > 0) tags.push('列印' + nu.b);
@@ -236,13 +248,13 @@ function sopVolumes_() {
   return { vols: vols, byVol: byVol };
 }
 
-function opStatus_(op) { return op === '完成' ? 'V' : op === '刺令' ? '已刺令' : '已領取'; }
+function opStatus_(op) { return op === '完成' ? 'V' : op === '敕令' ? '已敕令' : '已領取'; }
 
 function pageLabel_(unit) { return unit.replace(/^.+冊\s*/, '') || unit; }
 
 function tUpdCards_(q) {
   if (!q.op) {
-    return btnCard_('更新進度・選動作', '#8B7355', '第一步：選動作', ['刺令', '領取', '完成'].map(function(op) {
+    return btnCard_('更新進度・選動作', '#8B7355', '第一步：選動作', ['敕令', '領取', '完成'].map(function(op) {
       return pbBtn_(op, 'action=tupd&step=name&op=' + encodeURIComponent(op), op, 'secondary');
     }));
   }
@@ -271,10 +283,11 @@ function tUpdCards_(q) {
       var isStung = !!st.stung[uk];
       var disabled = false;
       var disabledLabel = '';
-      if (q.op === '刺令' && (hasTaken || isStung)) { disabled = true; disabledLabel = pageLabel_(o.unit) + ' (已刺令)'; }
+      if (q.op === '敕令' && (hasTaken || isStung)) { disabled = true; disabledLabel = pageLabel_(o.unit) + ' (已敕令)'; }
       if (q.op === '領取' && (hasTaken && !isStung)) { disabled = true; disabledLabel = pageLabel_(o.unit) + ' (已領取)'; }
       if (disabled) {
-        return pbBtn_(disabledLabel, 'action=ignore', disabledLabel, 'secondary', '#cccccc');
+        // 反黑按鈕：不帶 displayText，點擊後不會在聊天室送出文字
+        return { type: 'button', action: { type: 'postback', label: disabledLabel, data: 'action=ignore' }, height: 'sm', margin: 'sm', style: 'secondary', color: '#666666' };
       }
       return pbBtn_(pageLabel_(o.unit) + '(庫' + (o.b + o.c) + ')',
         'action=tupd&step=done&op=' + encodeURIComponent(q.op) + '&name=' + encodeURIComponent(q.name) + '&unit=' + encodeURIComponent(o.unit),
@@ -345,7 +358,7 @@ function handleTrainPostback_(data) {
   if (q.action === 'case') return caseCard_(q.caseId);
   if (q.action === 'casestatus') return doCaseStatus_(q.caseId, q.to);
   if ((q.action === 'claim' || q.action === 'done' || q.action === 'sting') && q.name && q.unit) {
-    return setTrain_(q.name, q.unit, q.action === 'done' ? 'V' : q.action === 'sting' ? '已刺令' : '已領取');
+    return setTrain_(q.name, q.unit, q.action === 'done' ? 'V' : q.action === 'sting' ? '已敕令' : '已領取');
   }
   if (q.action === 'addStock' && q.unit && q.kind) {
     ensureTrainSheets_();

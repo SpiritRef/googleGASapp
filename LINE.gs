@@ -462,8 +462,8 @@ function handleCommand_(text) {
   if (/^(庫存|庫存查詢)$/.test(t)) return stockText_();
   if (/^管理員名單$/.test(t)) return adminList_();
 
-  var tm = t.match(/^(刺令|領取|完成)\s+(\S+)\s+(.+)$/);
-  if (tm) return setTrain_(tm[2], tm[3].trim(), tm[1] === '完成' ? 'V' : tm[1] === '刺令' ? '已刺令' : '已領取');
+  var tm = t.match(/^(敕令|領取|完成)\s+(\S+)\s+(.+)$/);
+  if (tm) return setTrain_(tm[2], tm[3].trim(), tm[1] === '完成' ? 'V' : tm[1] === '敕令' ? '已敕令' : '已領取');
   var am = t.match(/^補庫存\s+(.+)\s+(蓋章|列印)$/);
   if (am) {
     ensureTrainSheets_();
@@ -835,7 +835,7 @@ function trainMenuCard_() {
     header: { type: 'box', layout: 'vertical', backgroundColor: '#8B7355',
       contents: [{ type: 'text', text: '訓練管理', size: 'md', color: '#ffffff', weight: 'bold' }] },
     body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
-      { type: 'text', text: '打字更新進度：刺令/領取/完成 姓名 單元', size: 'sm', color: '#333333', wrap: true },
+      { type: 'text', text: '打字更新進度：敕令/領取/完成 姓名 單元', size: 'sm', color: '#333333', wrap: true },
       { type: 'text', text: '補庫存 單元 蓋章/列印', size: 'sm', color: '#333333', wrap: true },
       { type: 'text', text: '例：領取 Ren 第一冊1-32', size: 'xs', color: '#999999', wrap: true }
     ] },
