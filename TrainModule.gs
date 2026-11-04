@@ -105,14 +105,14 @@ function apprenticeState_() {
     var nm = String(r[1]).trim(); if (!nm) return;
     var st = norm_(r[3]);
     var uk = norm_(r[2]);
-    var g = by[nm] || (by[nm] = { name: nm, active: 0, done: 0, latestIdx: -1, earliest: Infinity, units: [], stung: {}, have: {} });
+    var g = by[nm] || (by[nm] = { name: nm, active: 0, done: 0, latestIdx: -1, earliest: Infinity, units: [], stung: {}, have: {}, completed: {} });
     if (st === '已領取') {
       g.active++;
       g.units.push(String(r[2]).trim());
       var tm = new Date(r[4]).getTime();
       if (!isNaN(tm) && tm < g.earliest) g.earliest = tm;
     }
-    if (st === 'V' || st === 'v') g.done++;
+    if (st === 'V' || st === 'v') { g.done++; g.completed[uk] = true; }
     if (st === '已敕令') g.stung[uk] = true;
     if (st === 'V' || st === 'v' || st === '已領取' || st === '已敕令') g.have[uk] = true;
     if ((st === '已領取' || st === 'V' || st === 'v')) {
@@ -276,7 +276,7 @@ function tUpdCards_(q) {
     var sv2 = sopVolumes_();
     var list = sv2.byVol[q.vol] || [];
     if (!list.length) return textCard_('無此冊', '#B04A3A', q.vol);
-    var st = apprenticeState_().by[q.name] || { have: {}, stung: {} };
+    var st = apprenticeState_().by[q.name] || { have: {}, stung: {}, completed: {} };
     return btnCard_('更新進度・選單元 (' + q.name + ' - ' + q.vol + ')', '#8B7355', '第四步：選單元（括號內為現庫存）', list.slice(0, 20).map(function(o) {
       var uk = norm_(o.unit);
       var hasTaken = !!st.have[uk];
@@ -285,6 +285,7 @@ function tUpdCards_(q) {
       var disabledLabel = '';
       if (q.op === '敕令' && (hasTaken || isStung)) { disabled = true; disabledLabel = pageLabel_(o.unit) + ' (已敕令)'; }
       if (q.op === '領取' && (hasTaken && !isStung)) { disabled = true; disabledLabel = pageLabel_(o.unit) + ' (已領取)'; }
+      if (q.op === '完成' && !!st.completed[uk]) { disabled = true; disabledLabel = pageLabel_(o.unit) + ' (已完成)'; }
       if (disabled) {
         // 反黑按鈕：不帶 displayText，點擊後不會在聊天室送出文字
         return { type: 'button', action: { type: 'postback', label: disabledLabel, data: 'action=ignore' }, height: 'sm', margin: 'sm', style: 'secondary', color: '#666666' };
