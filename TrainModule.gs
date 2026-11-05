@@ -99,27 +99,38 @@ function apprenticeState_() {
   var m = sopMap_();
   var pos = {}; m.list.forEach(function(o) { pos[o.key] = o.idx; });
   var rows = trainRows_().rows;
+  // 先以「姓名+單元」為 key，保留最後一筆（最新）狀態，避免流水帳舊紀錄干擾
+  var latest = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var nm = String(r[1]).trim(); if (!nm) continue;
+    var uk = norm_(r[2]); if (!uk) continue;
+    latest[norm_(nm) + '|' + uk] = { name: nm, unit: String(r[2]).trim(), status: norm_(r[3]), time: r[4] };
+  }
   var by = {};
   var unmatched = [];
-  rows.forEach(function(r) {
-    var nm = String(r[1]).trim(); if (!nm) return;
-    var st = norm_(r[3]);
-    var uk = norm_(r[2]);
+  var lkeys = Object.keys(latest);
+  for (var i = 0; i < lkeys.length; i++) {
+    var rec = latest[lkeys[i]];
+    var nm = rec.name;
+    var uk = norm_(rec.unit);
+    var st = rec.status;
     var g = by[nm] || (by[nm] = { name: nm, active: 0, done: 0, latestIdx: -1, earliest: Infinity, units: [], stung: {}, have: {}, completed: {} });
     if (st === '已領取') {
       g.active++;
-      g.units.push(String(r[2]).trim());
-      var tm = new Date(r[4]).getTime();
+      g.units.push(rec.unit);
+      var tm = new Date(rec.time).getTime();
       if (!isNaN(tm) && tm < g.earliest) g.earliest = tm;
     }
-    if (st === 'V' || st === 'v') { g.done++; g.completed[uk] = true; }
+    if (st === 'V' || st === 'v') g.done++;
     if (st === '已敕令') g.stung[uk] = true;
     if (st === 'V' || st === 'v' || st === '已領取' || st === '已敕令') g.have[uk] = true;
-    if ((st === '已領取' || st === 'V' || st === 'v')) {
+    if (st === 'V' || st === 'v') g.completed[uk] = true;
+    if (st === '已領取' || st === 'V' || st === 'v') {
       if (uk && pos[uk] !== undefined) { if (pos[uk] > g.latestIdx) g.latestIdx = pos[uk]; }
-      else if (uk && unmatched.length < 3 && unmatched.indexOf(String(r[2]).trim()) === -1) unmatched.push(String(r[2]).trim());
+      else if (uk && unmatched.length < 3 && unmatched.indexOf(rec.unit) === -1) unmatched.push(rec.unit);
     }
-  });
+  }
   return { sop: m, by: by, unmatched: unmatched };
 }
 
