@@ -52,7 +52,7 @@ function trainAppend_(name, unit, status) {
       if (norm_(rows[i][1]) === norm_(name) && norm_(rows[i][2]) === norm_(unit) && norm_(rows[i][3]) === norm_(status)) {
         return false;
       }
-      var m = String(rows[i][0]).match(new RegExp('^' + ymd + '-(\\\\d+)$'));
+      var m = String(rows[i][0]).match(new RegExp('^' + ymd + '-(\\d+)$'));
       if (m) {
         var n = parseInt(m[1], 10);
         if (n > maxSeq) maxSeq = n;
