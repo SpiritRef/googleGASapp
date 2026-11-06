@@ -338,6 +338,7 @@ function handleAllowedEvent_(ev) {
   }
   if (ev.type === 'message' && ev.message && ev.message.type === 'text' && ev.replyToken) {
     var txt = String(ev.message.text || '').trim();
+    var uid = (ev.source && ev.source.userId) || '';
     var ansCons = (typeof handleConsumableCommand_ === 'function') ? handleConsumableCommand_(txt, uid) : null;
     if (ansCons) {
       if (ansCons && typeof ansCons === 'object' && ansCons.card) replyLine_(ev.replyToken, ansCons.card, ansCons.copy);
