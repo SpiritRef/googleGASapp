@@ -89,10 +89,16 @@ function consumableQuery_() {
     var stock = Number(r[1]) || 0;
     var safe = Number(r[2]) || 0;
     var warn = stock < safe ? ' ⚠️' : '';
-    rows.push({ type: 'box', layout: 'horizontal', margin: idx > 0 ? 'sm' : 'none', contents: [
-      { type: 'text', text: name + warn, size: 'sm', color: '#333333', flex: 3, wrap: true },
-      { type: 'text', text: '庫存 ' + stock, size: 'sm', color: '#333333', flex: 2, wrap: true },
-      { type: 'text', text: '安全 ' + safe, size: 'sm', color: '#333333', flex: 2, wrap: true }
+    var upd = r[3];
+    var updStr = '';
+    try { updStr = (upd instanceof Date) ? Utilities.formatDate(upd, Session.getScriptTimeZone(), 'MM/dd HH:mm') : String(upd || '').slice(0, 16); } catch (e) { updStr = String(upd || '').slice(0, 16); }
+    rows.push({ type: 'box', layout: 'vertical', margin: idx > 0 ? 'sm' : 'none', contents: [
+      { type: 'box', layout: 'horizontal', contents: [
+        { type: 'text', text: name + warn, size: 'sm', color: '#333333', flex: 3, wrap: true },
+        { type: 'text', text: '庫存 ' + stock, size: 'sm', color: '#333333', flex: 2, wrap: true },
+        { type: 'text', text: '安全 ' + safe, size: 'sm', color: '#333333', flex: 2, wrap: true }
+      ]},
+      { type: 'text', text: '更新 ' + updStr, size: 'xs', color: '#999999', wrap: true, margin: 'xs' }
     ]});
   });
   if (!rows.length) return textCard_('耗材查詢', '#8B7355', '耗材總表無資料');
