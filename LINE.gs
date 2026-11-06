@@ -329,10 +329,22 @@ function handleAllowedEvent_(ev) {
       if (ansPb.card) replyLine_(ev.replyToken, ansPb.card, ansPb.copy);
       else replyLine_(ev.replyToken, ansPb);
     }
+    var ansCons = handleConsumablePostback_(String(ev.postback.data || ''));
+    if (ansCons) {
+      if (ansCons.card) replyLine_(ev.replyToken, ansCons.card, ansCons.copy);
+      else replyLine_(ev.replyToken, ansCons);
+    }
     return;
   }
   if (ev.type === 'message' && ev.message && ev.message.type === 'text' && ev.replyToken) {
-    var ans = handleCommand_(String(ev.message.text || ''));
+    var txt = String(ev.message.text || '');
+    var ansCons = handleConsumableCommand_(txt, uid);
+    if (ansCons) {
+      if (ansCons && typeof ansCons === 'object' && ansCons.card) replyLine_(ev.replyToken, ansCons.card, ansCons.copy);
+      else replyLine_(ev.replyToken, ansCons);
+      return;
+    }
+    var ans = handleCommand_(txt);
     if (ans) {
       if (ans && typeof ans === 'object' && ans.card) replyLine_(ev.replyToken, ans.card, ans.copy);
       else replyLine_(ev.replyToken, ans);
@@ -814,6 +826,7 @@ function menuCard_() {
     footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
       pbBtn_('諮詢查詢', 'action=menu&go=consult', '諮詢查詢', 'primary', '#8B7355'),
       pbBtn_('訓練管理', 'action=menu&go=train', '訓練管理', 'secondary'),
+      pbBtn_('耗材管理', 'action=consumable_menu', '耗材管理', 'secondary'),
       // 💡 加入「管理員名單」按鈕，點擊後會自動在對話框送出文字
       { type: 'button', action: { type: 'message', label: '管理員名單', text: '管理員名單' }, style: 'secondary', height: 'sm', margin: 'sm' }
     ] } } };
