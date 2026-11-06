@@ -116,10 +116,10 @@ function consumableMenuCard_() {
       { type: 'text', text: '選擇操作類型', size: 'sm', color: '#333333', wrap: true }
     ] },
     footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
+      pbBtn_('庫存查詢', 'action=consumable_query', '耗材查詢', 'primary', '#8B7355'),
       pbBtn_('進貨', 'action=consumable_select&type=in', '耗材進貨', 'secondary'),
       pbBtn_('消耗', 'action=consumable_select&type=out', '耗材消耗', 'secondary'),
       pbBtn_('盤點', 'action=consumable_select&type=check', '耗材盤點', 'secondary'),
-      pbBtn_('庫存查詢', 'action=consumable_query', '耗材查詢', 'primary', '#8B7355'),
       { type: 'button', action: { type: 'postback', label: '新增耗材', data: 'action=consumable_prefill&hint=' + encodeURIComponent('請輸入：耗材新增 物品名稱 初始數量'), inputOption: 'openKeyboard', fillInText: '耗材新增 ' }, style: 'secondary', height: 'sm', margin: 'sm' }
     ] } } };
 }
