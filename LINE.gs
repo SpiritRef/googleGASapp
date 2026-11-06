@@ -329,7 +329,7 @@ function handleAllowedEvent_(ev) {
       if (ansPb.card) replyLine_(ev.replyToken, ansPb.card, ansPb.copy);
       else replyLine_(ev.replyToken, ansPb);
     }
-    var ansCons = handleConsumablePostback_(String(ev.postback.data || ''));
+    var ansCons = (typeof handleConsumablePostback_ === 'function') ? handleConsumablePostback_(String(ev.postback.data || '')) : null;
     if (ansCons) {
       if (ansCons.card) replyLine_(ev.replyToken, ansCons.card, ansCons.copy);
       else replyLine_(ev.replyToken, ansCons);
@@ -338,7 +338,7 @@ function handleAllowedEvent_(ev) {
   }
   if (ev.type === 'message' && ev.message && ev.message.type === 'text' && ev.replyToken) {
     var txt = String(ev.message.text || '').trim();
-    var ansCons = handleConsumableCommand_(txt, uid);
+    var ansCons = (typeof handleConsumableCommand_ === 'function') ? handleConsumableCommand_(txt, uid) : null;
     if (ansCons) {
       if (ansCons && typeof ansCons === 'object' && ansCons.card) replyLine_(ev.replyToken, ansCons.card, ansCons.copy);
       else replyLine_(ev.replyToken, ansCons);
