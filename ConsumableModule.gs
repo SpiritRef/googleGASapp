@@ -91,7 +91,7 @@ function consumableQuery_() {
     var warn = stock < safe ? ' ⚠️' : '';
     var upd = r[3];
     var updStr = '';
-    try { updStr = (upd instanceof Date) ? Utilities.formatDate(upd, Session.getScriptTimeZone(), 'MM/dd HH:mm') : String(upd || '').slice(0, 16); } catch (e) { updStr = String(upd || '').slice(0, 16); }
+    try { updStr = (upd instanceof Date) ? Utilities.formatDate(upd, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm') : String(upd || '').slice(0, 16); } catch (e) { updStr = String(upd || '').slice(0, 16); }
     rows.push({ type: 'box', layout: 'vertical', margin: idx > 0 ? 'sm' : 'none', contents: [
       { type: 'box', layout: 'horizontal', contents: [
         { type: 'text', text: name + warn, size: 'sm', color: '#333333', flex: 3, wrap: true },
