@@ -114,7 +114,7 @@ function consumableMenuCard_() {
       pbBtn_('消耗', 'action=consumable_select&type=out', '耗材消耗', 'secondary'),
       pbBtn_('盤點', 'action=consumable_select&type=check', '耗材盤點', 'secondary'),
       pbBtn_('庫存查詢', 'action=consumable_query', '耗材查詢', 'secondary'),
-      { type: 'button', action: { type: 'uri', label: '新增耗材', uri: 'line://msg/text/' + encodeURIComponent('耗材新增 物品名稱 初始數量') }, style: 'primary', height: 'sm', margin: 'sm', color: '#8B7355' }
+      { type: 'button', action: { type: 'postback', label: '新增耗材', data: 'action=ignore', inputOption: 'openKeyboard', fillInText: '耗材新增 物品名稱 初始數量' }, style: 'primary', height: 'sm', margin: 'sm', color: '#8B7355' }
     ] } } };
 }
 
@@ -133,8 +133,7 @@ function consumableSelectCard_(type) {
   }
   if (!items.length) return textCard_('耗材', '#8B7355', '耗材總表無資料，請先新增耗材');
   var btns = items.slice(0, 20).map(function(name) {
-    var uri = 'line://msg/text/' + encodeURIComponent(cmdPrefix + ' ' + name + ' ');
-    return { type: 'button', action: { type: 'uri', label: name, uri: uri }, style: 'secondary', height: 'sm', margin: 'sm' };
+    return { type: 'button', action: { type: 'postback', label: name, data: 'action=ignore', inputOption: 'openKeyboard', fillInText: cmdPrefix + ' ' + name + ' ' }, style: 'secondary', height: 'sm', margin: 'sm' };
   });
   return btnCard_('耗材' + prefix + '・選物品', '#8B7355', '點選物品後輸入數量', btns);
 }
