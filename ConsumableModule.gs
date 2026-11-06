@@ -180,5 +180,9 @@ function handleConsumableCommand_(text, uid) {
     if (!isAdmin) return textCard_('權限不足', '#B04A3A', '此功能僅限管理員使用');
     return consumableQuery_();
   }
+  if (/^耗材管理$/.test(text)) {
+    if (!isAdmin) return textCard_('權限不足', '#B04A3A', '此功能僅限管理員使用');
+    return consumableMenuCard_();
+  }
   return null;
 }
