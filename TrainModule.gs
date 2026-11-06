@@ -358,6 +358,7 @@ function handleTrainPostback_(data) {
     if (p[0]) q[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || '');
   });
   if (q.action === 'ignore') return true;
+  if (q.action === 'train_prefill') return textCard_('補庫存', '#8B7355', q.hint || '請輸入：補庫存 單元 列印/蓋章 數量');
   if (q.action === 'progress') return trainOverview_();
   if (q.action === 'stock') return stockText_();
   if (q.action === 'stockcheck') return stockCheckAll_();

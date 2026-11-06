@@ -477,23 +477,27 @@ function handleCommand_(text) {
 
   var tm = t.match(/^(敕令|領取|完成)\s+(\S+)\s+(.+)$/);
   if (tm) return setTrain_(tm[2], tm[3].trim(), tm[1] === '完成' ? 'V' : tm[1] === '敕令' ? '已敕令' : '已領取');
-  var am = t.match(/^補庫存\s+(.+)\s+(蓋章|列印)$/);
+  var am = t.match(/^補庫存\s+(.+)\s+(蓋章|列印)(?:\s+(\d+))?$/);
   if (am) {
     ensureTrainSheets_();
     var mm2 = sopMap_().map[norm_(am[1])];
     if (!mm2) return textCard_('找不到單元', '#B04A3A', am[1] + '（用「庫存」看正確名稱）');
     var sh2 = sheetByName_(SHEET_SOP);
     var isC = am[2] === '蓋章';
+    var qty = am[3] ? Number(am[3]) : 1;
+    if (qty < 1) qty = 1;
     var newB, newC;
     if (isC) {
-      if (mm2.b > 0) { newB = mm2.b - 1; newC = mm2.c + 1; }
-      else { newB = mm2.b; newC = mm2.c + 1; }
+      // 蓋章：優先將已列印的轉為蓋章
+      var conv = Math.min(qty, mm2.b);
+      newB = mm2.b - conv;
+      newC = mm2.c + qty;
     } else {
-      newB = mm2.b + 1; newC = mm2.c;
+      newB = mm2.b + qty; newC = mm2.c;
     }
     sh2.getRange(mm2.row, 2).setValue(newB);
     sh2.getRange(mm2.row, 3).setValue(newC);
-    return textCard_('已補庫存', '#4A7C59', am[1] + ' ' + am[2] + '+1（現印' + newB + '章' + newC + '）');
+    return textCard_('已補庫存', '#4A7C59', am[1] + ' ' + am[2] + '+' + qty + '（現印' + newB + '章' + newC + '）');
   }
   var sm = t.match(/^設庫存\s+(.+)\s+(列印|蓋章)\s+(\d+)$/);
   if (sm) return setStock_(sm[1].trim(), sm[2], Number(sm[3]));
@@ -850,7 +854,7 @@ function trainMenuCard_() {
       contents: [{ type: 'text', text: '訓練管理', size: 'md', color: '#ffffff', weight: 'bold' }] },
     body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
       { type: 'text', text: '打字更新進度：敕令/領取/完成 姓名 單元', size: 'sm', color: '#333333', wrap: true },
-      { type: 'text', text: '補庫存 單元 蓋章/列印', size: 'sm', color: '#333333', wrap: true },
+      { type: 'text', text: '補庫存 單元 蓋章/列印 (或補庫存輸入後加 數量)', size: 'sm', color: '#333333', wrap: true },
       { type: 'text', text: '例：領取 Ren 第一冊1-32', size: 'xs', color: '#999999', wrap: true }
     ] },
     footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
@@ -858,7 +862,8 @@ function trainMenuCard_() {
       pbBtn_('庫存查詢', 'action=stock', '庫存查詢', 'secondary'),
       pbBtn_('庫存盤點', 'action=stockcheck', '庫存盤點', 'secondary'),
       pbBtn_('更新進度', 'action=tupd', '更新進度', 'secondary'),
-      pbBtn_('補庫存', 'action=tadd', '補庫存', 'secondary')
+      pbBtn_('補庫存', 'action=tadd', '補庫存', 'secondary'),
+       { type: 'button', action: { type: 'postback', label: '補庫存輸入', data: 'action=train_prefill&hint=' + encodeURIComponent('請輸入：補庫存 單元 列印/蓋章 數量'), inputOption: 'openKeyboard', fillInText: '補庫存 ' }, style: 'secondary', height: 'sm', margin: 'sm' }
     ] } } };
 }
 function caseListCard_(filter) {

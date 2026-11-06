@@ -114,7 +114,7 @@ function consumableMenuCard_() {
       pbBtn_('消耗', 'action=consumable_select&type=out', '耗材消耗', 'secondary'),
       pbBtn_('盤點', 'action=consumable_select&type=check', '耗材盤點', 'secondary'),
       pbBtn_('庫存查詢', 'action=consumable_query', '耗材查詢', 'secondary'),
-      { type: 'button', action: { type: 'postback', label: '新增耗材', data: 'action=ignore', inputOption: 'openKeyboard', fillInText: '耗材新增 物品名稱 初始數量' }, style: 'primary', height: 'sm', margin: 'sm', color: '#8B7355' }
+      { type: 'button', action: { type: 'postback', label: '新增耗材', data: 'action=consumable_prefill&hint=' + encodeURIComponent('請輸入：耗材新增 物品名稱 初始數量'), inputOption: 'openKeyboard', fillInText: '耗材新增 ' }, style: 'primary', height: 'sm', margin: 'sm', color: '#8B7355' }
     ] } } };
 }
 
@@ -133,7 +133,8 @@ function consumableSelectCard_(type) {
   }
   if (!items.length) return textCard_('耗材', '#8B7355', '耗材總表無資料，請先新增耗材');
   var btns = items.slice(0, 20).map(function(name) {
-    return { type: 'button', action: { type: 'postback', label: name, data: 'action=ignore', inputOption: 'openKeyboard', fillInText: cmdPrefix + ' ' + name + ' ' }, style: 'secondary', height: 'sm', margin: 'sm' };
+    var hint = '請輸入數量（整數）';
+    return { type: 'button', action: { type: 'postback', label: name, data: 'action=consumable_prefill&hint=' + encodeURIComponent(hint), inputOption: 'openKeyboard', fillInText: cmdPrefix + ' ' + name + ' ' }, style: 'secondary', height: 'sm', margin: 'sm' };
   });
   return btnCard_('耗材' + prefix + '・選物品', '#8B7355', '點選物品後輸入數量', btns);
 }
@@ -147,6 +148,7 @@ function handleConsumablePostback_(data) {
   if (q.action === 'consumable_menu') return consumableMenuCard_();
   if (q.action === 'consumable_query') return consumableQuery_();
   if (q.action === 'consumable_select' && q.type) return consumableSelectCard_(q.type);
+  if (q.action === 'consumable_prefill') return textCard_('耗材輸入', '#8B7355', q.hint || '請輸入指令');
   return null;
 }
 
