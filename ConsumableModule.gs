@@ -152,6 +152,7 @@ function handleConsumablePostback_(data) {
 }
 
 function handleConsumableCommand_(text, uid) {
+  text = String(text || '').trim();
   var ur = uid ? userRole_(uid) : null;
   var isAdmin = !!(ur && ur.on && ur.role === 'admin');
   var operator = (ur && ur.name) ? ur.name : (uid || '未知');

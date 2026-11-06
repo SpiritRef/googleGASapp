@@ -337,7 +337,7 @@ function handleAllowedEvent_(ev) {
     return;
   }
   if (ev.type === 'message' && ev.message && ev.message.type === 'text' && ev.replyToken) {
-    var txt = String(ev.message.text || '');
+    var txt = String(ev.message.text || '').trim();
     var ansCons = handleConsumableCommand_(txt, uid);
     if (ansCons) {
       if (ansCons && typeof ansCons === 'object' && ansCons.card) replyLine_(ev.replyToken, ansCons.card, ansCons.copy);
