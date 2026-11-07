@@ -138,11 +138,12 @@ function targetGroup_() {
 
 function pushLine_(to, text) {
   var token = props_().getProperty('LINE_TOKEN');
+  var msg = (text && typeof text === 'object') ? text : { type: 'text', text: String(text || '').slice(0, 5000) };
   var res = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
     method: 'post',
     headers: { Authorization: 'Bearer ' + token },
     contentType: 'application/json',
-    payload: JSON.stringify({ to: to, messages: [text] }),
+    payload: JSON.stringify({ to: to, messages: [msg] }),
     muteHttpExceptions: true
   });
   if (res.getResponseCode() !== 200) throw new Error('LINE ' + res.getResponseCode() + ' ' + res.getContentText().slice(0, 120));
