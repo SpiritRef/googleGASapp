@@ -258,19 +258,15 @@ function rateLimit_(key, limit, windowSec) {
   return true;
 }
 
-function verifyAdminPassword_(pwd) {
-  var url = props_().getProperty('AUTH_GAS_URL');
-  if (!url) return false;
+function verifyGithubToken_(token) {
+  if (!token) return false;
   try {
-    var res = UrlFetchApp.fetch(url, {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify({ action: 'getGithubToken', user: String(pwd || ''), ip: '', ua: 'GAS-push' }),
+    var res = UrlFetchApp.fetch('https://api.github.com/user', {
+      method: 'get',
+      headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github.v3+json' },
       muteHttpExceptions: true
     });
-    if (res.getResponseCode() !== 200) return false;
-    var j = JSON.parse(res.getContentText());
-    return j.success === true;
+    return res.getResponseCode() === 200;
   } catch (e) { return false; }
 }
 
@@ -310,9 +306,10 @@ function pushMessage_(d) {
   }
   if (!message) return { success: false, message: '請輸入訊息內容' };
   if (message.length > 1000) return { success: false, message: '訊息過長（上限 1000 字）' };
-  if (!verifyAdminPassword_(password)) {
-    auditPush_(payload, message, false, 'password_wrong');
-    return { success: false, message: '密碼錯誤' };
+  var githubToken = String((d && d.githubToken) || '').trim();
+  if (!githubToken || !verifyGithubToken_(githubToken)) {
+    auditPush_(payload, message, false, 'token_invalid');
+    return { success: false, message: '驗證失敗，請重新登入後台' };
   }
   try {
     pushLine_(payload.uid, message);
@@ -333,7 +330,8 @@ function pushMessageManual_(d) {
   if (!message) return { success: false, message: '請輸入訊息內容' };
   if (message.length > 1000) return { success: false, message: '訊息過長（上限 1000 字）' };
   if (!rateLimit_('push_manual_' + uid, 5, 900)) return { success: false, message: '嘗試次數過多，請稍後再試' };
-  if (!verifyAdminPassword_(password)) return { success: false, message: '密碼錯誤' };
+  var githubToken = String((d && d.githubToken) || '').trim();
+  if (!githubToken || !verifyGithubToken_(githubToken)) return { success: false, message: '驗證失敗，請重新登入後台' };
   try {
     pushLine_(uid, message);
     auditPush_({ name: name || uid }, message, true, '');

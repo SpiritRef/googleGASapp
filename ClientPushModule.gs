@@ -91,7 +91,7 @@ function clientListCarousel_(kw, page) {
     if (bubbles.length >= 12) break;
     var part = items.slice(i, i + chunk);
     var btns = part.map(function(c) {
-      return { type: 'button', action: { type: 'uri', label: String(c.name || '').slice(0, 18), uri: 'https://spiritref.github.io/client-push/?t=' + makePushToken_(c.uid, c.name) }, style: 'secondary', height: 'sm', margin: 'sm' };
+      return { type: 'button', action: { type: 'uri', label: String(c.name || '').slice(0, 18), uri: 'https://spiritref.github.io/login/client-push.html?t=' + makePushToken_(c.uid, c.name) }, style: 'secondary', height: 'sm', margin: 'sm' };
     });
     if (i + chunk >= items.length && total > page * pageSize) {
       btns.push({ type: 'button', action: { type: 'postback', label: '下一頁', data: 'action=client_list&kw=' + encodeURIComponent(kw) + '&page=' + (page + 1) }, style: 'primary', height: 'sm', margin: 'sm' });
