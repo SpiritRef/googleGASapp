@@ -25,6 +25,7 @@
 | `GameModule.gs` | 小遊戲卡片、生日選擇器、遊戲選擇記錄、歡迎回來 |
 | `TrainModule.gs` | 訓練與庫存管理（已從 LINE.gs 切出） |
 | `ConsumableModule.gs` | 耗材庫存與盤點管理（新增/進貨/消耗/盤點/查詢） |
+| `ClientPushModule.gs` | 客戶推播管理（LINE 客戶查詢 Carousel、token 產生、管理員權限） |
 
 ## 4. 試算表工作表
 

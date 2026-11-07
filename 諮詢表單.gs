@@ -1,5 +1,6 @@
 // ===== GAS-WEB：諮詢表單專用（含LINE通知）。屬性：RECAPTCHA_SECRET / LINE_TOKEN / ADMIN_EMAIL / GROUP_ID(備用) =====
 var SHEET_MAIN = '諮詢表單內容';
+var SHEET_PUSH_LOG = '推播紀錄';
 var SHEET_GROUP = 'LINE_Group';
 var OTP_TTL = 600;
 var RECAPTCHA_MIN = 0.5;
@@ -15,6 +16,9 @@ function doPost(e) {
     var data = JSON.parse((e.postData && e.postData.contents) || '{}');
     if (data.action === 'sendOtp') return json_(sendOtp_(data));
     if (data.action === 'submit') return json_(submit_(data));
+  if (data.action === 'resolve_push_token') return json_(resolvePushToken_(data));
+  if (data.action === 'push_message') return json_(pushMessage_(data));
+  if (data.action === 'push_message_manual') return json_(pushMessageManual_(data));
     return json_({ success: false, message: '未知動作' });
   } catch (err) {
     return json_({ success: false, message: '系統錯誤: ' + err });
@@ -198,4 +202,144 @@ function verifyRecaptcha_(token) {
     var j = JSON.parse(res.getContentText());
     return j.success === true && (j.score === undefined || j.score >= RECAPTCHA_MIN);
   } catch (e) { return false; }
+}
+
+// ===== 客戶推播 API =====
+function b64urlEncodeStr_(str) {
+  return Utilities.base64EncodeWebSafe(str, Utilities.Charset.UTF_8).replace(/=+$/, '');
+}
+function b64urlEncodeBytes_(bytes) {
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, '');
+}
+function b64urlDecodeStr_(str) {
+  var s = String(str || '').replace(/-/g, '+').replace(/_/g, '/');
+  var pad = s.length % 4;
+  if (pad) s += '='.repeat(4 - pad);
+  var bytes = Utilities.base64Decode(s);
+  return Utilities.newBlob(bytes).getDataAsString(Utilities.Charset.UTF_8);
+}
+
+function verifyPushToken_(token) {
+  if (!token || typeof token !== 'string') return null;
+  var parts = token.split('.');
+  if (parts.length !== 2) return null;
+  var body = parts[0], sig = parts[1];
+  var secret = props_().getProperty('PUSH_LINK_SECRET');
+  if (!secret) return null;
+  var expected = b64urlEncodeBytes_(Utilities.computeHmacSha256Signature(body, secret));
+  if (!constantTimeEqual_(sig, expected)) return null;
+  var payload;
+  try { payload = JSON.parse(b64urlDecodeStr_(body)); } catch (e) { return null; }
+  if (!payload || !payload.uid || !payload.exp) return null;
+  if (Date.now() > Number(payload.exp)) return null;
+  return payload;
+}
+
+function constantTimeEqual_(a, b) {
+  a = String(a || ''); b = String(b || '');
+  if (a.length !== b.length) return false;
+  var r = 0;
+  for (var i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+
+function resolvePushToken_(d) {
+  var payload = verifyPushToken_(String((d && d.token) || '').trim());
+  if (!payload) return { success: false, message: '連結已失效，請重新從 LINE 取得' };
+  return { success: true, name: payload.name };
+}
+
+function rateLimit_(key, limit, windowSec) {
+  var cache = CacheService.getScriptCache();
+  var k = 'rl_' + key;
+  var n = Number(cache.get(k) || 0);
+  if (n >= limit) return false;
+  cache.put(k, String(n + 1), windowSec);
+  return true;
+}
+
+function verifyAdminPassword_(pwd) {
+  var url = props_().getProperty('AUTH_GAS_URL');
+  if (!url) return false;
+  try {
+    var res = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ action: 'getGithubToken', user: String(pwd || ''), ip: '', ua: 'GAS-push' }),
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() !== 200) return false;
+    var j = JSON.parse(res.getContentText());
+    return j.success === true;
+  } catch (e) { return false; }
+}
+
+function auditPushSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SHEET_PUSH_LOG);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_PUSH_LOG);
+    sh.appendRow(['時間', '客戶名稱(遮罩)', '訊息長度', '訊息雜湊', '結果', '錯誤']);
+  }
+  return sh;
+}
+
+function auditPush_(payload, message, ok, err) {
+  try {
+    var sh = auditPushSheet_();
+    var name = (payload && payload.name) ? String(payload.name) : '';
+    var masked = name.length > 1 ? name.charAt(0) + '**' : name;
+    var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(message || ''), Utilities.Charset.UTF_8);
+    var hex = digest.map(function(b) { return (b < 0 ? b + 256 : b).toString(16).padStart(2, '0'); }).join('').slice(0, 12);
+    sh.appendRow([new Date(), masked, String(message || '').length, hex, ok ? '成功' : '失敗', err || '']);
+  } catch (e) {}
+}
+
+function pushMessage_(d) {
+  var token = String((d && d.token) || '').trim();
+  var password = String((d && d.password) || '');
+  var message = String((d && d.message) || '').trim();
+  var payload = verifyPushToken_(token);
+  if (!payload) {
+    auditPush_(null, message, false, 'token_invalid');
+    return { success: false, message: '連結已失效，請重新從 LINE 取得' };
+  }
+  if (!rateLimit_('push_token_' + token.slice(0, 16), 5, 900)) {
+    auditPush_(payload, message, false, 'rate_limit');
+    return { success: false, message: '嘗試次數過多，請稍後再試' };
+  }
+  if (!message) return { success: false, message: '請輸入訊息內容' };
+  if (message.length > 1000) return { success: false, message: '訊息過長（上限 1000 字）' };
+  if (!verifyAdminPassword_(password)) {
+    auditPush_(payload, message, false, 'password_wrong');
+    return { success: false, message: '密碼錯誤' };
+  }
+  try {
+    pushLine_(payload.uid, message);
+    auditPush_(payload, message, true, '');
+    return { success: true };
+  } catch (e) {
+    auditPush_(payload, message, false, String(e).slice(0, 120));
+    return { success: false, message: '推播失敗：' + e };
+  }
+}
+
+function pushMessageManual_(d) {
+  var uid = String((d && d.uid) || '').trim();
+  var name = String((d && d.name) || '').trim();
+  var password = String((d && d.password) || '');
+  var message = String((d && d.message) || '').trim();
+  if (!/^U[0-9a-fA-F]{32}$/.test(uid)) return { success: false, message: 'LINE 使用者 ID 格式錯誤' };
+  if (!message) return { success: false, message: '請輸入訊息內容' };
+  if (message.length > 1000) return { success: false, message: '訊息過長（上限 1000 字）' };
+  if (!rateLimit_('push_manual_' + uid, 5, 900)) return { success: false, message: '嘗試次數過多，請稍後再試' };
+  if (!verifyAdminPassword_(password)) return { success: false, message: '密碼錯誤' };
+  try {
+    pushLine_(uid, message);
+    auditPush_({ name: name || uid }, message, true, '');
+    return { success: true };
+  } catch (e) {
+    auditPush_({ name: name || uid }, message, false, String(e).slice(0, 120));
+    return { success: false, message: '推播失敗：' + e };
+  }
 }

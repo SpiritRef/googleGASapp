@@ -323,6 +323,9 @@ function handleAllowedEvent_(ev) {
 
     if (handleGamePostback_(ev, pbData)) return;
 
+    var ansClient = handleClientPostback_(pbData, ev);
+    if (ansClient) return;
+
     var ansPb = handleTrainPostback_(String(ev.postback.data || ''));
     if (ansPb === true) return; // ignore 偽停用按鈕，不回覆
     if (ansPb) {
@@ -339,6 +342,12 @@ function handleAllowedEvent_(ev) {
   if (ev.type === 'message' && ev.message && ev.message.type === 'text' && ev.replyToken) {
     var txt = String(ev.message.text || '').trim();
     var uid = (ev.source && ev.source.userId) || '';
+    var cm = txt.match(/^查客戶\s+(.+)$/);
+    if (cm) {
+      if (!isAdminUid_(uid)) { replyLine_(ev.replyToken, textCard_('權限不足', '#B04A3A', '此功能僅限管理員使用')); return; }
+      replyLine_(ev.replyToken, clientListCarousel_(cm[1].trim(), 1));
+      return;
+    }
     var ansCons = (typeof handleConsumableCommand_ === 'function') ? handleConsumableCommand_(txt, uid) : null;
     if (ansCons) {
       if (ansCons && typeof ansCons === 'object' && ansCons.card) replyLine_(ev.replyToken, ansCons.card, ansCons.copy);
@@ -833,6 +842,7 @@ function menuCard_() {
       pbBtn_('諮詢查詢', 'action=menu&go=consult', '諮詢查詢', 'primary', '#8B7355'),
       pbBtn_('訓練管理', 'action=menu&go=train', '訓練管理', 'secondary'),
       pbBtn_('耗材管理', 'action=consumable_menu', '耗材管理', 'secondary'),
+      pbBtn_('客戶管理', 'action=client_menu', '客戶管理', 'secondary'),
       // 💡 加入「管理員名單」按鈕，點擊後會自動在對話框送出文字
       { type: 'button', action: { type: 'message', label: '管理員名單', text: '管理員名單' }, style: 'secondary', height: 'sm', margin: 'sm' }
     ] } } };
