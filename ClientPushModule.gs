@@ -73,7 +73,7 @@ function clientMenuCard_() {
     body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '請選擇查詢方式', size: 'sm', color: '#333333', wrap: true }] },
     footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
       pbBtn_('查詢全部客戶', 'action=client_list&kw=all&page=1', '查詢全部客戶', 'primary', '#8B7355'),
-      { type: 'button', action: { type: 'uri', label: '關鍵字查詢', uri: 'line://msg/text/查客戶%20' }, style: 'secondary', height: 'sm', margin: 'sm' }
+      { type: 'button', action: { type: 'uri', label: '關鍵字查詢', uri: 'line://msg/text/?text=' + encodeURIComponent('查客戶 ') }, style: 'secondary', height: 'sm', margin: 'sm' }
     ] } } };
 }
 
