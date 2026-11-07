@@ -310,16 +310,17 @@ function tUpdCards_(q) {
 }
 
 function tAddCards_(q) {
+  var kindLabel = (q.kind === 'C') ? '蓋章' : '列印';
   if (!q.kind) {
     return btnCard_('補庫存・選種類', '#8B7355', '第一步：選種類', [
-      pbBtn_('列印+1', 'action=tadd&step=vol&kind=B', '補庫存 列印', 'secondary'),
-      pbBtn_('蓋章+1', 'action=tadd&step=vol&kind=C', '補庫存 蓋章', 'primary', '#8B7355')
+      pbBtn_('列印', 'action=tadd&step=vol&kind=B', '補庫存 列印', 'secondary'),
+      pbBtn_('蓋章', 'action=tadd&step=vol&kind=C', '補庫存 蓋章', 'primary', '#8B7355')
     ]);
   }
   if (!q.vol && q.step !== 'done') {
     var sv = sopVolumes_();
     if (!sv.vols.length) return textCard_('無SOP資料', '#B04A3A', 'SOP表是空的');
-    return btnCard_('補庫存・選冊', '#8B7355', '第二步：選冊', sv.vols.map(function(v) {
+    return btnCard_('補庫存・選冊 (' + kindLabel + ')', '#8B7355', '第二步：選冊', sv.vols.map(function(v) {
       return pbBtn_(v, 'action=tadd&step=unit&kind=' + q.kind + '&vol=' + encodeURIComponent(v), v, 'secondary');
     }));
   }
@@ -327,10 +328,9 @@ function tAddCards_(q) {
     var sv2 = sopVolumes_();
     var list = sv2.byVol[q.vol] || [];
     if (!list.length) return textCard_('無此冊', '#B04A3A', q.vol);
-    return btnCard_('補庫存・選單元', '#8B7355', '第三步：選單元', list.slice(0, 20).map(function(o) {
-      return pbBtn_(pageLabel_(o.unit) + '(庫' + (o.b + o.c) + ')',
-        'action=tadd&step=done&kind=' + q.kind + '&unit=' + encodeURIComponent(o.unit),
-        '補庫存 ' + o.unit, 'secondary');
+    return btnCard_('補庫存・選單元 (' + kindLabel + ')', '#8B7355', '第三步：選單元', list.slice(0, 20).map(function(o) {
+      var fillText = '補庫存 ' + o.unit + ' ' + kindLabel + ' ';
+      return { type: 'button', action: { type: 'postback', label: pageLabel_(o.unit) + '(庫' + (o.b + o.c) + ')', data: 'action=tadd_prefill&hint=' + encodeURIComponent('請輸入數量（整數）'), inputOption: 'openKeyboard', fillInText: fillText }, style: 'secondary', height: 'sm', margin: 'sm' };
     }));
   }
   ensureTrainSheets_();
@@ -359,6 +359,7 @@ function handleTrainPostback_(data) {
   });
   if (q.action === 'ignore') return true;
   if (q.action === 'train_prefill') return textCard_('補庫存', '#8B7355', q.hint || '請輸入：補庫存 單元 列印/蓋章 數量');
+  if (q.action === 'tadd_prefill') return textCard_('補庫存', '#8B7355', q.hint || '請輸入數量（整數）');
   if (q.action === 'progress') return trainOverview_();
   if (q.action === 'stock') return stockText_();
   if (q.action === 'stockcheck') return stockCheckAll_();

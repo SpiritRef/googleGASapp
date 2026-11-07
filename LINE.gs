@@ -863,7 +863,7 @@ function trainMenuCard_() {
       pbBtn_('庫存盤點', 'action=stockcheck', '庫存盤點', 'secondary'),
       pbBtn_('更新進度', 'action=tupd', '更新進度', 'secondary'),
       pbBtn_('補庫存', 'action=tadd', '補庫存', 'secondary'),
-       { type: 'button', action: { type: 'postback', label: '補庫存輸入', data: 'action=train_prefill&hint=' + encodeURIComponent('請輸入：補庫存 單元 列印/蓋章 數量'), inputOption: 'openKeyboard', fillInText: '補庫存 ' }, style: 'secondary', height: 'sm', margin: 'sm' }
+        
     ] } } };
 }
 function caseListCard_(filter) {
