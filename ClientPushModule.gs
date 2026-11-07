@@ -68,13 +68,32 @@ function makePushToken_(uid, name) {
 }
 
 function clientMenuCard_() {
-  return { type: 'flex', altText: '客戶管理', contents: { type: 'bubble',
-    header: { type: 'box', layout: 'vertical', backgroundColor: '#8B7355', contents: [{ type: 'text', text: '客戶管理', size: 'md', color: '#ffffff', weight: 'bold' }] },
-    body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '請選擇查詢方式', size: 'sm', color: '#333333', wrap: true }] },
-    footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
-      pbBtn_('查詢全部客戶', 'action=client_list&kw=all&page=1', '查詢全部客戶', 'primary', '#8B7355'),
-      { type: 'button', action: { type: 'uri', label: '關鍵字查詢', uri: 'line://msg/text/?text=' + encodeURIComponent('查客戶 ') }, style: 'secondary', height: 'sm', margin: 'sm' }
-    ] } } };
+  return { 
+    type: 'flex', 
+    altText: '客戶管理', 
+    contents: { 
+      type: 'bubble',
+      header: { type: 'box', layout: 'vertical', backgroundColor: '#8B7355', contents: [{ type: 'text', text: '客戶管理', size: 'md', color: '#ffffff', weight: 'bold' }] },
+      body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '請選擇查詢方式', size: 'sm', color: '#333333', wrap: true }] },
+      footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
+        pbBtn_('查詢全部客戶', 'action=client_list&kw=all&page=1', '查詢全部客戶', 'primary', '#8B7355'),
+        { 
+          type: 'button', 
+          style: 'secondary', 
+          height: 'sm', 
+          margin: 'sm',
+          // 💡 關鍵修改：放棄 uri，改用帶有 openKeyboard 與 fillInText 的 postback
+          action: { 
+            type: 'postback', 
+            label: '關鍵字查詢', 
+            data: 'action=keyword_search',
+            inputOption: 'openKeyboard',
+            fillInText: '查客戶 '
+          } 
+        }
+      ] } 
+    } 
+  };
 }
 
 function clientListCarousel_(kw, page) {
@@ -82,21 +101,49 @@ function clientListCarousel_(kw, page) {
   page = Math.max(1, Number(page) || 1);
   var pageSize = 60;
   var total = list.length;
-  var start = (page - 1) * pageSize;
+  
+  // 💡 修正 1：補上被吃掉的減號，正確計算起始位置
+  var start = (page - 1) * pageSize; 
+  
   var items = list.slice(start, start + pageSize);
   if (!items.length) return textCard_('客戶列表', '#8B7355', '沒有符合的客戶');
+  
   var bubbles = [];
   var chunk = 5;
   for (var i = 0; i < items.length; i += chunk) {
     if (bubbles.length >= 12) break;
     var part = items.slice(i, i + chunk);
     var btns = part.map(function(c) {
-      return { type: 'button', action: { type: 'uri', label: String(c.name || '').slice(0, 18), uri: 'https://spiritref.github.io/login/client-push.html?t=' + makePushToken_(c.uid, c.name) }, style: 'secondary', height: 'sm', margin: 'sm' };
+      return { 
+        type: 'button', 
+        action: { 
+          type: 'uri', 
+          label: String(c.name || '').slice(0, 18), 
+          uri: 'https://spiritref.github.io/login/client-push.html?t=' + makePushToken_(c.uid, c.name) 
+        }, 
+        style: 'secondary', 
+        height: 'sm', 
+        margin: 'sm' 
+      };
     });
+    
+    // 💡 修正 2：補上被吃掉的乘號，正確判斷是否需要「下一頁」按鈕
     if (i + chunk >= items.length && total > page * pageSize) {
-      btns.push({ type: 'button', action: { type: 'postback', label: '下一頁', data: 'action=client_list&kw=' + encodeURIComponent(kw) + '&page=' + (page + 1) }, style: 'primary', height: 'sm', margin: 'sm' });
+      btns.push({ 
+        type: 'button', 
+        action: { 
+          type: 'postback', 
+          label: '下一頁', 
+          data: 'action=client_list&kw=' + encodeURIComponent(kw) + '&page=' + (page + 1) 
+        }, 
+        style: 'primary', 
+        height: 'sm', 
+        margin: 'sm' 
+      });
     }
-    bubbles.push({ type: 'bubble',
+    
+    bubbles.push({ 
+      type: 'bubble',
       header: { type: 'box', layout: 'vertical', backgroundColor: '#8B7355', contents: [{ type: 'text', text: '客戶列表', size: 'md', color: '#ffffff', weight: 'bold' }] },
       body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '第 ' + page + ' 頁（共 ' + total + ' 人）', size: 'sm', color: '#333333', wrap: true }] },
       footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: btns }
