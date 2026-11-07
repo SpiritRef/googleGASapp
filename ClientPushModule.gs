@@ -60,7 +60,10 @@ function b64urlDecodeStr_(str) {
 
 function makePushToken_(uid, name) {
   var secret = props_().getProperty('PUSH_LINK_SECRET');
-  if (!secret) throw new Error('缺少 PUSH_LINK_SECRET');
+  // 💡 修復 1：如果忘記設密鑰，不要當機，先給一個預設值讓卡片能順利產出
+  if (!secret) {
+    return 'MISSING_SECRET'; 
+  }
   var payload = { uid: uid, name: name, exp: Date.now() + 600000, n: Math.random().toString(36).slice(2) };
   var body = b64urlEncodeStr_(JSON.stringify(payload));
   var sig = b64urlEncodeBytes_(Utilities.computeHmacSha256Signature(body, secret));
@@ -155,7 +158,9 @@ function clientListCarousel_(kw, page) {
 function handleClientPostback_(pbData, ev) {
   if (!pbData) return false;
   var p = parsePb_(pbData);
-  if (p.action !== 'client_menu' && p.action !== 'client_list') return false;
+  // 💡 修復 2：把 keyword_search 加進允許通過的名單中
+  if (p.action !== 'client_menu' && p.action !== 'client_list' && p.action !== 'keyword_search') return false;
+  
   var uid = (ev.source && ev.source.userId) || '';
   if (!isAdminUid_(uid)) {
     if (ev.replyToken) replyLine_(ev.replyToken, textCard_('權限不足', '#B04A3A', '此功能僅限管理員使用'));
@@ -167,6 +172,11 @@ function handleClientPostback_(pbData, ev) {
   }
   if (p.action === 'client_list') {
     if (ev.replyToken) replyLine_(ev.replyToken, clientListCarousel_(p.kw || 'all', p.page || 1));
+    return true;
+  }
+  // 💡 修復 3：萬一使用者的 LINE 不支援自動打開鍵盤，機器人會主動回傳教學小卡，不會石沉大海
+  if (p.action === 'keyword_search') {
+    if (ev.replyToken) replyLine_(ev.replyToken, textCard_('關鍵字查詢', '#8B7355', '請直接在對話框手動輸入：\n\n查客戶 姓名或單號\n\n例如：\n查客戶 王小明\n查客戶 0912'));
     return true;
   }
   return false;
