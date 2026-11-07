@@ -391,6 +391,7 @@ function handleLine_(data) {
       handleAllowedEvent_(ev);
     } else if (uid) {
       if (!ev.replyToken) return;
+      if (ur && !ur.on) return; // 個人停用：完全不處理、不回覆
       if (isAdmin) handleAllowedEvent_(ev);
       else guestEvent_(ev, ur, false);
     }
